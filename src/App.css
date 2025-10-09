@@ -1,0 +1,453 @@
+/* App.css */
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #89f7fe, #66a6ff);
+}
+
+.login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.login-card {
+margin: auto;
+  background: white;
+  padding: 3rem;
+  border-radius: 50px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  width: 390px;
+}
+
+.login-card h2 {
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.login-card input {
+  margin: auto;
+  width: 95%;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.login-card button {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  border: none;
+  border-radius: 8px;
+  background-color: #1a73e8;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.login-card button:hover {
+  background-color: #155ab6;
+  transform: scale(1.03);
+}
+
+.error-msg {
+  margin-top: 0.5rem;
+  color: #e53935;
+  font-weight: bold;
+}
+
+.button-row {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.button-row button {
+  flex: 1;
+}
+button:hover {
+      background-color: #0090aa;
+      scale: 1.05;}
+
+/* フルスクリーン専用のシフト表スタイル */
+.fullscreen-table {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #89f7fe, #66a6ff);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.fullscreen-table .login-card {
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 20px;
+  padding: 2rem;
+}
+
+.shift-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 80vh;
+  margin-top: 1rem;
+}
+
+.shift-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 800px;
+  background-color: white;
+  font-size: 0.95rem;
+}
+
+.shift-table th {
+  background-color: #1a73e8;
+  color: white;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  position: sticky;
+  top: 0;
+}
+
+.shift-table td {
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+.shift-table tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+
+/* 既存のApp.cssに追加するスタイル */
+
+/* 編集画面のテーブルスタイル */
+.shift-edit-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  background-color: white;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* テーブルを横スクロール可能にするコンテナ */
+.shift-edit-table-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  max-width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+/* スクロールバーのスタイリング */
+.shift-edit-table-container::-webkit-scrollbar {
+  height: 12px;
+}
+
+.shift-edit-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+.shift-edit-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+  border: 2px solid #f1f1f1;
+}
+
+.shift-edit-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Firefox用のスクロールバースタイル */
+.shift-edit-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+/* ヘッダーの色分け */
+.shift-edit-table .name-header {
+  background-color: #4CAF50;
+  color: white;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 15;
+  min-width: 80px;
+}
+
+.shift-edit-table .checkbox-header {
+  background-color: #607D8B;
+  color: white;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  position: sticky;
+  left: 80px;
+  top: 0;
+  z-index: 15;
+  min-width: 50px;
+}
+
+.shift-edit-table .start-header {
+  background-color: #2196F3;
+  color: white;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  position: sticky;
+  left: 130px;
+  top: 0;
+  z-index: 15;
+  min-width: 80px;
+}
+
+.shift-edit-table .end-header {
+  background-color: #FF9800;
+  color: white;
+  padding: 0.1rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  position: sticky;
+  left: 210px;
+  top: 0;
+  z-index: 15;
+  min-width: 80px;
+}
+
+.shift-edit-table .time-header {
+  background-color: #795548;
+  color: white;
+  padding: 0.1rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  font-weight: bold;
+  font-size: 0.5rem;
+  width: 25px !important;
+  min-width: 25px !important;
+  max-width: 25px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* セルの色分け */
+.shift-edit-table .name-cell {
+  background-color: #E8F5E8;
+  padding: 0.4rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  min-width: 80px;
+}
+
+.shift-edit-table .checkbox-cell {
+  background-color: #F5F5F5;
+  padding: 0.4rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  position: sticky;
+  left: 80px;
+  z-index: 5;
+  min-width: 50px;
+}
+
+.shift-edit-table .start-cell {
+  background-color: #E3F2FD;
+  padding: 0.4rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  position: sticky;
+  left: 130px;
+  z-index: 5;
+  min-width: 80px;
+}
+
+.shift-edit-table .end-cell {
+  background-color: #FFF3E0;
+  padding: 0.4rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  position: sticky;
+  left: 210px;
+  z-index: 5;
+  min-width: 80px;
+}
+
+.shift-edit-table .time-cell {
+  padding: 0.1rem;
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+  width: 25px !important;
+  height: 30px;
+  min-width: 25px !important;
+  max-width: 25px !important;
+  font-size: 0.7rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* 休みの行のスタイル */
+.shift-edit-table .off-row {
+  background-color: #e0e0e0;
+  opacity: 0.7;
+}
+
+.shift-edit-table .off-row .name-cell {
+  background-color: #d0d0d0;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+.shift-edit-table .off-row .checkbox-cell {
+  background-color: #d0d0d0;
+  position: sticky;
+  left: 80px;
+  z-index: 5;
+}
+
+.shift-edit-table .off-row .start-cell {
+  background-color: #d0d0d0;
+  position: sticky;
+  left: 130px;
+  z-index: 5;
+}
+
+.shift-edit-table .off-row .end-cell {
+  background-color: #d0d0d0;
+  position: sticky;
+  left: 210px;
+  z-index: 5;
+}
+
+.shift-edit-table tr:nth-child(even) .name-cell {
+  background-color: #D4E6D4;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+.shift-edit-table tr:nth-child(even) .checkbox-cell {
+  background-color: #E8E8E8;
+  position: sticky;
+  left: 80px;
+  z-index: 5;
+}
+
+.shift-edit-table tr:nth-child(even) .start-cell {
+  background-color: #BBDEFB;
+  position: sticky;
+  left: 130px;
+  z-index: 5;
+}
+
+.shift-edit-table tr:nth-child(even) .end-cell {
+  background-color: #FFE0B2;
+  position: sticky;
+  left: 210px;
+  z-index: 5;
+}
+
+.shift-edit-table input[type="time"] {
+  width: 100%;
+  padding: 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: white;
+}
+
+.shift-edit-table input[type="time"]:disabled {
+  background-color: #f0f0f0;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.shift-edit-table input[type="time"]:focus {
+  outline: none;
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+}
+
+.shift-edit-table input[type="checkbox"] {
+  transform: scale(1.2);
+  cursor: pointer;
+}
+
+
+
+/* 小さいナビゲーションボタンのスタイル */
+.nav-button-small {
+  background-color: #1a73e8 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.9rem !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  min-width: 80px !important;
+  width: auto !important;
+  max-width: 120px !important;
+}
+
+.nav-button-small:hover {
+  background-color: #155ab6 !important;
+  transform: scale(1.05) !important;
+}
+
+/* 小さい保存ボタンのスタイル */
+.save-button-small {
+  background-color: #4CAF50 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 0.6rem 1.2rem !important;
+  font-size: 0.9rem !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  min-width: 70px !important;
+  width: auto !important;
+  max-width: 100px !important;
+}
+
+.save-button-small:hover {
+  background-color: #45a049 !important;
+  transform: scale(1.05) !important;
+}
