@@ -26,7 +26,7 @@ function StaffWorkHours({ onBack }) {
     if (isAuthenticated) {
       fetchWorkData(managerNumber, selectedYear, selectedMonth);
     }
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, isAuthenticated, managerNumber]);
 
   const handleAuthentication = async () => {
     if (!managerNumber) {
@@ -340,7 +340,7 @@ function StaffWorkHours({ onBack }) {
   return (
     <div className="login-wrapper">
       <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h2 style={{ margin: 0 }}>就労時間確認</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>年度:</label>
@@ -361,7 +361,7 @@ function StaffWorkHours({ onBack }) {
           </div>
         </div>
         
-        <p>管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{userName}</strong></p>
+        <p style={{ fontSize: '0.9rem' }}>管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{userName}</strong></p>
 
         <div style={{
           backgroundColor: '#f9f9f9',
@@ -395,7 +395,7 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: '#FF9800',
               color: 'white',
-              padding: '0.4rem 0.1rem',
+              padding: '0.5rem 1rem',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
@@ -427,7 +427,8 @@ function StaffWorkHours({ onBack }) {
                   marginBottom: '0.5rem',
                   padding: '0.5rem',
                   backgroundColor: '#f9f9f9',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  flexWrap: 'wrap'
                 }}>
                   <strong style={{ minWidth: '60px' }}>{slot.name}</strong>
                   <span>{slot.start} - {slot.end}</span>
@@ -468,7 +469,8 @@ function StaffWorkHours({ onBack }) {
                   padding: '0.5rem',
                   border: '1px solid #ddd',
                   borderRadius: '4px',
-                  width: '80px'
+                  minWidth: '80px',
+                  flex: '1 1 auto'
                 }}
               />
               <input
@@ -478,7 +480,8 @@ function StaffWorkHours({ onBack }) {
                 style={{
                   padding: '0.5rem',
                   border: '1px solid #ddd',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  flex: '1 1 auto'
                 }}
               />
               <span>-</span>
@@ -489,7 +492,8 @@ function StaffWorkHours({ onBack }) {
                 style={{
                   padding: '0.5rem',
                   border: '1px solid #ddd',
-                  borderRadius: '4px'
+                  borderRadius: '4px',
+                  flex: '1 1 auto'
                 }}
               />
               <button
@@ -501,7 +505,9 @@ function StaffWorkHours({ onBack }) {
                   borderRadius: '4px',
                   padding: '0.5rem 1rem',
                   cursor: 'pointer',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  flex: '1 1 auto',
+                  minWidth: '80px'
                 }}
               >
                 追加
@@ -531,7 +537,8 @@ function StaffWorkHours({ onBack }) {
           padding: '1rem',
           borderRadius: '8px',
           marginBottom: '1rem',
-          display: 'flex',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
           gap: '0.5rem',
           justifyContent: 'center',
           alignItems: 'center'
@@ -541,13 +548,13 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: viewMode === 'monthly' ? '#1976D2' : 'white',
               color: viewMode === 'monthly' ? 'white' : '#1976D2',
-              padding: '0.5rem 1.5rem',
+              padding: '0.5rem 0.75rem',
               border: '2px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              flex: '1',
-              minWidth: '80px'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             月別
@@ -557,13 +564,13 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: viewMode === 'weekly' ? '#1976D2' : 'white',
               color: viewMode === 'weekly' ? 'white' : '#1976D2',
-              padding: '0.5rem 1.5rem',
+              padding: '0.5rem 0.75rem',
               border: '2px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              flex: '1',
-              minWidth: '80px'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             週別
@@ -573,13 +580,13 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: viewMode === 'daily' ? '#1976D2' : 'white',
               color: viewMode === 'daily' ? 'white' : '#1976D2',
-              padding: '0.5rem 1.5rem',
+              padding: '0.5rem 0.75rem',
               border: '2px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              flex: '1',
-              minWidth: '80px'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             日別
@@ -589,13 +596,13 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: viewMode === 'time' ? '#1976D2' : 'white',
               color: viewMode === 'time' ? 'white' : '#1976D2',
-              padding: '0.5rem 1.5rem',
+              padding: '0.5rem 0.75rem',
               border: '2px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              flex: '1',
-              minWidth: '80px'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             時間帯別
@@ -605,13 +612,13 @@ function StaffWorkHours({ onBack }) {
             style={{
               backgroundColor: viewMode === 'all' ? '#1976D2' : 'white',
               color: viewMode === 'all' ? 'white' : '#1976D2',
-              padding: '0.5rem 1.5rem',
+              padding: '0.5rem 0.75rem',
               border: '2px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer',
               fontWeight: 'bold',
-              flex: '1',
-              minWidth: '80px'
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap'
             }}
           >
             全表示
@@ -678,10 +685,12 @@ function StaffWorkHours({ onBack }) {
                       marginBottom: '0.5rem',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
                     }}>
-                      <h3 style={{ margin: 0, color: '#E65100' }}>{group.key}</h3>
-                      <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                      <h3 style={{ margin: 0, color: '#E65100', fontSize: '1rem' }}>{group.key}</h3>
+                      <div style={{ fontSize: '0.85rem', color: '#666' }}>
                         {groupStats.workDays}日 | {groupStats.hours}h{groupStats.minutes}m
                         {groupStats.totalSalary > 0 && ` | ¥${groupStats.totalSalary.toLocaleString()}`}
                       </div>
@@ -694,29 +703,29 @@ function StaffWorkHours({ onBack }) {
                     overflow: 'auto',
                     maxHeight: '400px'
                   }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px', fontSize: '0.875rem' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
                         <tr>
-                          <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid #ddd' }}>
                             日付
                           </th>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
                             店舗
                           </th>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
                             開始時刻
                           </th>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
                             終了時刻
                           </th>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
                             休憩(分)
                           </th>
-                          <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
                             労働時間
                           </th>
                           {group.data.some(d => d.salary) && (
-                            <th style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
+                            <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
                               給料
                             </th>
                           )}
@@ -731,11 +740,11 @@ function StaffWorkHours({ onBack }) {
                             <tr key={record.id} style={{
                               backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9'
                             }}>
-                              <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '0.5rem', borderBottom: '1px solid #eee' }}>
                                 <strong>{record.date}</strong> ({getWeekday(record.date)})
                               </td>
                               <td style={{ 
-                                padding: '0.75rem', 
+                                padding: '0.5rem', 
                                 textAlign: 'center', 
                                 borderBottom: '1px solid #eee',
                                 fontWeight: 'bold',
@@ -743,17 +752,17 @@ function StaffWorkHours({ onBack }) {
                               }}>
                                 {record.store}店舗
                               </td>
-                              <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
                                 {formatTime(record.actual_start)}
                               </td>
-                              <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
                                 {formatTime(record.actual_end)}
                               </td>
-                              <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
                                 {record.break_minutes || 0}分
                               </td>
                               <td style={{ 
-                                padding: '0.75rem', 
+                                padding: '0.5rem', 
                                 textAlign: 'center', 
                                 borderBottom: '1px solid #eee',
                                 fontWeight: 'bold'
@@ -762,7 +771,7 @@ function StaffWorkHours({ onBack }) {
                               </td>
                               {group.data.some(d => d.salary) && (
                                 <td style={{ 
-                                  padding: '0.75rem', 
+                                  padding: '0.5rem', 
                                   textAlign: 'right', 
                                   borderBottom: '1px solid #eee',
                                   fontWeight: 'bold',
@@ -790,7 +799,9 @@ function StaffWorkHours({ onBack }) {
             padding: '0.75rem 2rem',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            width: '100%',
+            maxWidth: '300px'
           }}>
             メニューに戻る
           </button>
