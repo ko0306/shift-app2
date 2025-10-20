@@ -19,8 +19,19 @@ function StaffWorkHours({ onBack }) {
     { name: '夜', start: '22:00', end: '06:00' }
   ]);
   const [newSlotName, setNewSlotName] = useState('');
-  const [newSlotStart, setNewSlotStart] = useState('');
-  const [newSlotEnd, setNewSlotEnd] = useState('');
+  const [newSlotStart, setNewSlotStart] = useState('00:00');
+  const [newSlotEnd, setNewSlotEnd] = useState('00:00');
+
+  // 36時間分のタイムスロット生成
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let hour = 0; hour < 36; hour++) {
+      options.push(`${String(hour).padStart(2, '0')}:00`);
+    }
+    return options;
+  };
+
+  const timeOptions = generateTimeOptions();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -125,22 +136,27 @@ function StaffWorkHours({ onBack }) {
     return Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
   };
 
+  // 36時間対応の時間比較関数
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + (minutes || 0);
+  };
+
   const isTimeInSlot = (timeStr, slotStart, slotEnd) => {
     if (!timeStr) return false;
     
-    const [hour, minute] = timeStr.split(':').map(Number);
-    const timeMinutes = hour * 60 + minute;
+    const timeMinutes = timeToMinutes(timeStr);
+    const startMinutes = timeToMinutes(slotStart);
+    let endMinutes = timeToMinutes(slotEnd);
     
-    const [startHour, startMinute] = slotStart.split(':').map(Number);
-    const startMinutes = startHour * 60 + startMinute;
-    
-    const [endHour, endMinute] = slotEnd.split(':').map(Number);
-    let endMinutes = endHour * 60 + endMinute;
-    
+    // 翌日にまたがる場合（例：22:00-06:00）
     if (endMinutes <= startMinutes) {
       endMinutes += 24 * 60;
+      
+      // 時刻が開始時刻より前の場合、翌日とみなす
       if (timeMinutes < startMinutes) {
-        return timeMinutes + 24 * 60 >= startMinutes && timeMinutes + 24 * 60 < endMinutes;
+        return (timeMinutes + 24 * 60) >= startMinutes && (timeMinutes + 24 * 60) < endMinutes;
       }
     }
     
@@ -163,12 +179,18 @@ function StaffWorkHours({ onBack }) {
     }
     setTimeSlots([...timeSlots, { name: newSlotName, start: newSlotStart, end: newSlotEnd }]);
     setNewSlotName('');
-    setNewSlotStart('');
-    setNewSlotEnd('');
+    setNewSlotStart('00:00');
+    setNewSlotEnd('00:00');
   };
 
   const deleteTimeSlot = (index) => {
     setTimeSlots(timeSlots.filter((_, i) => i !== index));
+  };
+
+  const updateTimeSlot = (index, field, value) => {
+    const updated = [...timeSlots];
+    updated[index][field] = value;
+    setTimeSlots(updated);
   };
 
   const calculateTotalStats = () => {
@@ -430,8 +452,45 @@ function StaffWorkHours({ onBack }) {
                   borderRadius: '4px',
                   flexWrap: 'wrap'
                 }}>
-                  <strong style={{ minWidth: '60px' }}>{slot.name}</strong>
-                  <span>{slot.start} - {slot.end}</span>
+                  <input
+                    type="text"
+                    value={slot.name}
+                    onChange={(e) => updateTimeSlot(index, 'name', e.target.value)}
+                    style={{
+                      minWidth: '60px',
+                      padding: '0.25rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      fontWeight: 'bold'
+                    }}
+                  />
+                  <select
+                    value={slot.start}
+                    onChange={(e) => updateTimeSlot(index, 'start', e.target.value)}
+                    style={{
+                      padding: '0.25rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    {timeOptions.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
+                  <span>-</span>
+                  <select
+                    value={slot.end}
+                    onChange={(e) => updateTimeSlot(index, 'end', e.target.value)}
+                    style={{
+                      padding: '0.25rem',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    {timeOptions.map(time => (
+                      <option key={time} value={time}>{time}</option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => deleteTimeSlot(index)}
                     style={{
@@ -473,8 +532,7 @@ function StaffWorkHours({ onBack }) {
                   flex: '1 1 auto'
                 }}
               />
-              <input
-                type="time"
+              <select
                 value={newSlotStart}
                 onChange={(e) => setNewSlotStart(e.target.value)}
                 style={{
@@ -483,10 +541,13 @@ function StaffWorkHours({ onBack }) {
                   borderRadius: '4px',
                   flex: '1 1 auto'
                 }}
-              />
+              >
+                {timeOptions.map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
               <span>-</span>
-              <input
-                type="time"
+              <select
                 value={newSlotEnd}
                 onChange={(e) => setNewSlotEnd(e.target.value)}
                 style={{
@@ -495,7 +556,11 @@ function StaffWorkHours({ onBack }) {
                   borderRadius: '4px',
                   flex: '1 1 auto'
                 }}
-              />
+              >
+                {timeOptions.map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
               <button
                 onClick={addTimeSlot}
                 style={{

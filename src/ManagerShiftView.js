@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// 日付文字列を正確に取得する関数（タイムゾーン対応）
+const getDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function ManagerShiftView({ onBack }) {
   const [selectedDate, setSelectedDate] = useState('');
   const [shiftData, setShiftData] = useState([]);
@@ -12,10 +20,11 @@ function ManagerShiftView({ onBack }) {
   const [currentView, setCurrentView] = useState('calendar');
   const [isEditing, setIsEditing] = useState(false);
   const [editingShifts, setEditingShifts] = useState([]);
+  const [showTimeline, setShowTimeline] = useState(false);
 
   useEffect(() => {
-    fetchAvailableDates();
     fetchUsers();
+    fetchAvailableDates();
   }, []);
 
   const fetchAvailableDates = async () => {
@@ -26,6 +35,7 @@ function ManagerShiftView({ onBack }) {
         .order('date');
 
       if (error) {
+        console.error('日付取得エラー:', error);
         return;
       }
 
@@ -37,65 +47,50 @@ function ManagerShiftView({ onBack }) {
   };
 
   const fetchUsers = async () => {
-    try {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('*');
+    const { data, error } = await supabase
+      .from('users')
+      .select('*');
 
-      if (error) {
-        return;
-      }
-
-      const userMapTemp = {};
-      if (users && users.length > 0) {
-        users.forEach(user => {
-          const managerNumber = user.manager_number;
-          if (managerNumber !== null && managerNumber !== undefined) {
-            userMapTemp[String(managerNumber)] = user.name || `ユーザー${managerNumber}`;
-            userMapTemp[Number(managerNumber)] = user.name || `ユーザー${managerNumber}`;
-          }
-        });
-      }
-      setUserMap(userMapTemp);
-    } catch (error) {
-      console.error('予期しないエラー:', error);
+    if (error) {
+      console.error(error);
+      return;
     }
+
+    const userMapTemp = {};
+    if (data) {
+      data.forEach(user => {
+        userMapTemp[user.manager_number] = user.name;
+        userMapTemp[String(user.manager_number)] = user.name;
+        userMapTemp[Number(user.manager_number)] = user.name;
+      });
+    }
+    setUserMap(userMapTemp);
   };
 
   const fetchShiftData = async (date) => {
     if (!date) return;
 
     setLoading(true);
-    try {
-      const { data: finalShifts, error: finalError } = await supabase
-        .from('final_shifts')
-        .select('*')
-        .eq('date', date)
-        .order('manager_number');
+    
+    const { data: finalShifts, error: finalError } = await supabase
+      .from('final_shifts')
+      .select('*')
+      .eq('date', date)
+      .order('manager_number');
 
-      if (!finalError && finalShifts && finalShifts.length > 0) {
-        setShiftData(finalShifts);
-      } else {
-        setShiftData([]);
-      }
-
-      setCurrentView('shift');
-    } catch (error) {
-      alert('エラーが発生しました');
-    } finally {
-      setLoading(false);
+    if (finalError) {
+      alert('データ取得に失敗しました');
+      setShiftData([]);
+    } else {
+      setShiftData(finalShifts || []);
     }
+
+    setCurrentView('shift');
+    setLoading(false);
   };
 
   const getUserName = (managerNumber) => {
-    if (!managerNumber && managerNumber !== 0) return '管理番号なし';
-    
-    const name = userMap[managerNumber] || 
-                 userMap[String(managerNumber)] || 
-                 userMap[Number(managerNumber)];
-    
-    if (name) return name;
-    return `管理番号: ${managerNumber}`;
+    return userMap[managerNumber] || '(不明)';
   };
 
   const handleDateSelect = (date) => {
@@ -109,6 +104,7 @@ function ManagerShiftView({ onBack }) {
     setSelectedDate('');
     setShiftData([]);
     setIsEditing(false);
+    setShowTimeline(false);
   };
 
   const changeDate = (delta) => {
@@ -121,20 +117,61 @@ function ManagerShiftView({ onBack }) {
       fetchShiftData(newDate);
       setIsEditing(false);
       setEditingShifts([]);
+      setShowTimeline(false);
     }
+  };
+
+  const parseTime36 = (timeStr) => {
+    if (!timeStr) return { hour: 9, min: 0 };
+    const parts = timeStr.split(':');
+    const hour = parseInt(parts[0], 10);
+    const min = parseInt(parts[1], 10);
+    return { hour, min };
+  };
+
+  const formatTime36 = (hour, min) => {
+    return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
   };
 
   const handleEditToggle = () => {
     if (!isEditing) {
-      setEditingShifts(shiftData.map(shift => ({
-        ...shift,
-        start_time: shift.start_time || '09:00',
-        end_time: shift.end_time || '17:00',
-        store: shift.store || '',
-        is_off: shift.is_off || isOffDay(shift)
-      })));
+      console.log('編集モード開始 - 元データ:', shiftData);
+      
+      setEditingShifts(shiftData.map(shift => {
+        const startTime = parseTime36(shift.start_time);
+        const endTime = parseTime36(shift.end_time);
+        
+        return {
+          ...shift,
+          startHour: startTime.hour,
+          startMin: startTime.min,
+          endHour: endTime.hour,
+          endMin: endTime.min,
+          store: shift.store || '',
+          is_off: shift.is_off || isOffDay(shift)
+        };
+      }));
+      setShowTimeline(false);
+    } else {
+      setShowTimeline(false);
     }
     setIsEditing(!isEditing);
+  };
+
+  const toggleTimeline = () => {
+    setShowTimeline(!showTimeline);
+  };
+
+  const generateTimeSlots = () => {
+    const slots = [];
+    for (let h = 0; h < 36; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const hh = h.toString().padStart(2, '0');
+        const mm = m.toString().padStart(2, '0');
+        slots.push(`${hh}:${mm}`);
+      }
+    }
+    return slots;
   };
 
   const handleShiftChange = (shiftId, field, value) => {
@@ -145,11 +182,15 @@ function ManagerShiftView({ onBack }) {
         
         if (field === 'is_off') {
           if (value) {
-            updatedShift.start_time = null;
-            updatedShift.end_time = null;
+            updatedShift.startHour = 0;
+            updatedShift.startMin = 0;
+            updatedShift.endHour = 0;
+            updatedShift.endMin = 0;
           } else {
-            updatedShift.start_time = updatedShift.start_time || '09:00';
-            updatedShift.end_time = updatedShift.end_time || '17:00';
+            updatedShift.startHour = updatedShift.startHour || 9;
+            updatedShift.startMin = updatedShift.startMin || 0;
+            updatedShift.endHour = updatedShift.endHour || 17;
+            updatedShift.endMin = updatedShift.endMin || 0;
           }
         }
         
@@ -166,12 +207,27 @@ function ManagerShiftView({ onBack }) {
       setLoading(true);
       
       for (const shift of editingShifts) {
+        const storeValue = shift.store;
+        
+        if (!storeValue || storeValue.trim() === '') {
+          alert(`${getUserName(shift.manager_number)}の店舗を選択または入力してください`);
+          setLoading(false);
+          return;
+        }
+
+        const startTime = shift.is_off 
+          ? null 
+          : `${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}:00`;
+        const endTime = shift.is_off 
+          ? null 
+          : `${String(shift.endHour).padStart(2, '0')}:${String(shift.endMin).padStart(2, '0')}:00`;
+
         const updateData = {
           date: shift.date,
           manager_number: shift.manager_number,
-          start_time: shift.is_off ? null : shift.start_time,
-          end_time: shift.is_off ? null : shift.end_time,
-          store: shift.store || null,
+          start_time: startTime,
+          end_time: endTime,
+          store: storeValue,
           is_off: shift.is_off
         };
 
@@ -182,13 +238,16 @@ function ManagerShiftView({ onBack }) {
           });
 
         if (error) {
-          alert(`更新に失敗しました: ${error.message}`);
+          console.error(`${getUserName(shift.manager_number)} の保存エラー:`, error);
+          alert(`${getUserName(shift.manager_number)} の保存に失敗しました: ${error.message}`);
+          setLoading(false);
           return;
         }
       }
 
       alert('シフトを更新しました');
       setIsEditing(false);
+      setShowTimeline(false);
       fetchShiftData(selectedDate);
       
     } catch (error) {
@@ -210,7 +269,7 @@ function ManagerShiftView({ onBack }) {
     const currentDate = new Date(startDate);
 
     for (let i = 0; i < 42; i++) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = getDateString(currentDate);
       const isCurrentMonth = currentDate.getMonth() === month;
       const hasShift = availableDates.includes(dateStr);
 
@@ -242,7 +301,7 @@ function ManagerShiftView({ onBack }) {
 
   const getWeekday = (dateStr) => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T00:00:00');
     return days[date.getDay()];
   };
 
@@ -252,11 +311,13 @@ function ManagerShiftView({ onBack }) {
            !shift.end_time ||
            shift.start_time === '' ||
            shift.end_time === '' ||
-           (shift.start_time === '00:00' && shift.end_time === '00:00');
+           (shift.start_time === '00:00' && shift.end_time === '00:00') ||
+           (shift.start_time === '00:00:00' && shift.end_time === '00:00:00');
   };
 
   const calendarDays = generateCalendarDays();
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const timeSlots = generateTimeSlots();
 
   const sortedShiftData = [...(isEditing ? editingShifts : shiftData)].sort((a, b) => {
     const aOff = isOffDay(a) ? 1 : 0;
@@ -397,28 +458,14 @@ function ManagerShiftView({ onBack }) {
 
   return (
     <div className="login-wrapper">
-      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="login-card" style={{ width: showTimeline ? '95vw' : '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
           <button onClick={() => changeDate(-1)}>◀</button>
           {selectedDate} ({getWeekday(selectedDate)}) のシフト
           <button onClick={() => changeDate(1)}>▶</button>
         </h2>
 
-        <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-          <button
-            onClick={() => setViewMode('list')}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: viewMode === 'list' ? '#2196F3' : '#f0f0f0',
-              color: viewMode === 'list' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-          >
-            リスト表示
-          </button>
+        <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', maxWidth: '600px', margin: '0 auto 1rem' }}>
           <button
             onClick={handleEditToggle}
             style={{
@@ -428,29 +475,61 @@ function ManagerShiftView({ onBack }) {
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              fontSize: '0.9rem'
             }}
           >
             {isEditing ? 'キャンセル' : '変更モード'}
           </button>
-          {isEditing && (
-            <button
-              onClick={handleUpdate}
-              disabled={loading}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.6 : 1,
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {loading ? '更新中...' : '更新'}
-            </button>
-          )}
+          <button
+            onClick={toggleTimeline}
+            disabled={!isEditing}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: !isEditing ? '#ccc' : (showTimeline ? '#9C27B0' : '#673AB7'),
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isEditing ? 'pointer' : 'not-allowed',
+              transition: 'all 0.3s ease',
+              fontSize: '0.9rem',
+              opacity: !isEditing ? 0.6 : 1
+            }}
+          >
+            {showTimeline ? 'リスト' : 'タイムライン'}
+          </button>
+          <button
+            onClick={handleUpdate}
+            disabled={loading || !isEditing}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: (!isEditing || loading) ? '#ccc' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: (loading || !isEditing) ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              fontSize: '0.9rem',
+              opacity: (!isEditing || loading) ? 0.6 : 1
+            }}
+          >
+            {loading ? '更新中...' : '更新'}
+          </button>
+          <button
+            onClick={handleBackToCalendar}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              fontSize: '0.9rem'
+            }}
+          >
+            カレンダー
+          </button>
         </div>
 
         {loading ? (
@@ -466,6 +545,138 @@ function ManagerShiftView({ onBack }) {
             borderRadius: '8px'
           }}>
             この日のシフトはありません
+          </div>
+        ) : showTimeline && isEditing ? (
+          <div style={{ overflowX: 'auto', marginTop: '1rem', width: '100%' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1200px' }}>
+              <thead>
+                <tr>
+                  <th style={{ minWidth: '80px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>名前</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', left: '80px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>店舗</th>
+                  <th style={{ minWidth: '40px', position: 'sticky', left: '140px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>休</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '180px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>開始</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '300px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>終了</th>
+                  {timeSlots.map((slot, i) => (
+                    <th key={i} style={{ minWidth: '30px', width: '30px', backgroundColor: '#F0E68C', border: '1px solid #ddd', fontSize: '0.7rem', padding: '0.2rem' }}>
+                      {slot}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedShiftData.map((shift, index) => {
+                  const editingShift = editingShifts.find(es => es.id === shift.id || 
+                                                                  (es.manager_number === shift.manager_number && !shift.id)) || shift;
+                  
+                  const startTimeStr = formatTime36(editingShift.startHour || 0, editingShift.startMin || 0);
+                  const endTimeStr = formatTime36(editingShift.endHour || 0, editingShift.endMin || 0);
+                  
+                  return (
+                    <tr key={shift.id || shift.manager_number || index}>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>
+                        <strong>{getUserName(shift.manager_number)}</strong>
+                      </td>
+                      <td style={{ position: 'sticky', left: '80px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <input
+                          type="text"
+                          value={editingShift.store || ''}
+                          onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'store', e.target.value)}
+                          placeholder="店舗"
+                          style={{
+                            padding: '0.3rem',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      </td>
+                      <td style={{ position: 'sticky', left: '140px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={editingShift.is_off || false}
+                          onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'is_off', e.target.checked)}
+                          style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ position: 'sticky', left: '180px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                          <select
+                            value={editingShift.startHour || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(37)].map((_, h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <select
+                            value={editingShift.startMin || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startMin', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(60)].map((_, m) => (
+                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td style={{ position: 'sticky', left: '300px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                          <select
+                            value={editingShift.endHour || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(37)].map((_, h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <select
+                            value={editingShift.endMin || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endMin', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(60)].map((_, m) => (
+                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      {timeSlots.map((slot, colIndex) => {
+                        const inShift = !editingShift.is_off && 
+                                       slot >= startTimeStr && 
+                                       slot < endTimeStr;
+                        
+                        let bgColor = 'transparent';
+                        if (editingShift.is_off) {
+                          bgColor = '#e0e0e0';
+                        } else if (inShift) {
+                          bgColor = '#90EE90';
+                        }
+                        
+                        return (
+                          <td key={colIndex} style={{ 
+                            backgroundColor: bgColor, 
+                            minWidth: '30px', 
+                            width: '30px', 
+                            border: '1px solid #ddd',
+                            padding: 0
+                          }} />
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div style={{
@@ -547,7 +758,7 @@ function ManagerShiftView({ onBack }) {
                             <span style={{ color: '#999', fontStyle: 'italic' }}>休み</span>
                           ) : (
                             <span style={{ fontWeight: 'bold' }}>
-                              {formatTime(editingShift.start_time || '09:00')} - {formatTime(editingShift.end_time || '17:00')}
+                              {formatTime36(editingShift.startHour || 0, editingShift.startMin || 0)} - {formatTime36(editingShift.endHour || 0, editingShift.endMin || 0)}
                             </span>
                           )
                         )}
@@ -585,36 +796,82 @@ function ManagerShiftView({ onBack }) {
                             />
                           </td>
                           <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                            <input
-                              type="time"
-                              value={editingShift.is_off ? '' : (editingShift.start_time || '09:00')}
-                              onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'start_time', e.target.value)}
-                              disabled={editingShift.is_off}
-                              style={{
-                                padding: '0.5rem',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                opacity: editingShift.is_off ? 0.5 : 1,
-                                width: '100px',
-                                backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
-                              }}
-                            />
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                              <select
+                                value={editingShift.startHour || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
+                                }}
+                              >
+                                {[...Array(37)].map((_, h) => (
+                                  <option key={h} value={h}>{h}</option>
+                                ))}
+                              </select>
+                              <span>:</span>
+                              <select
+                                value={editingShift.startMin || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startMin', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
+                                }}
+                              >
+                                {[...Array(60)].map((_, m) => (
+                                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                                ))}
+                              </select>
+                            </div>
                           </td>
                           <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                            <input
-                              type="time"
-                              value={editingShift.is_off ? '' : (editingShift.end_time || '17:00')}
-                              onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'end_time', e.target.value)}
-                              disabled={editingShift.is_off}
-                              style={{
-                                padding: '0.5rem',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                opacity: editingShift.is_off ? 0.5 : 1,
-                                width: '100px',
-                                backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
-                              }}
-                            />
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                              <select
+                                value={editingShift.endHour || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
+                                }}
+                              >
+                                {[...Array(37)].map((_, h) => (
+                                  <option key={h} value={h}>{h}</option>
+                                ))}
+                              </select>
+                              <span>:</span>
+                              <select
+                                value={editingShift.endMin || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endMin', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white'
+                                }}
+                              >
+                                {[...Array(60)].map((_, m) => (
+                                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                                ))}
+                              </select>
+                            </div>
                           </td>
                           <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
                             <input
@@ -636,19 +893,6 @@ function ManagerShiftView({ onBack }) {
             </table>
           </div>
         )}
-
-        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-          <button onClick={handleBackToCalendar} style={{
-            backgroundColor: '#607D8B',
-            color: 'white',
-            padding: '0.75rem 2rem',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}>
-            カレンダーに戻る
-          </button>
-        </div>
       </div>
     </div>
   );

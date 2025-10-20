@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
 function StaffShiftEdit({ onBack }) {
@@ -10,9 +10,30 @@ function StaffShiftEdit({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [editingShifts, setEditingShifts] = useState([]);
   const [selectedDays, setSelectedDays] = useState([]);
-  const [bulkStart, setBulkStart] = useState('');
-  const [bulkEnd, setBulkEnd] = useState('');
-  const [bulkStore, setBulkStore] = useState('');
+  const [bulkStartHour, setBulkStartHour] = useState('');
+  const [bulkStartMin, setBulkStartMin] = useState('');
+  const [bulkEndHour, setBulkEndHour] = useState('');
+  const [bulkEndMin, setBulkEndMin] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const parseTime = (timeStr) => {
+    if (!timeStr) return { hour: '', min: '' };
+    const parts = timeStr.split(':');
+    return { 
+      hour: parts[0] ? parseInt(parts[0], 10).toString() : '', 
+      min: parts[1] ? parseInt(parts[1], 10).toString() : '' 
+    };
+  };
 
   const handleAuthentication = async () => {
     if (!managerNumber || !name) {
@@ -39,7 +60,7 @@ function StaffShiftEdit({ onBack }) {
         .from('shifts')
         .select('*')
         .eq('manager_number', managerNumber)
-        .order('date');
+        .order('created_at', { ascending: false });
 
       if (shiftError) {
         setMessage('シフトデータの取得に失敗しました');
@@ -53,7 +74,15 @@ function StaffShiftEdit({ onBack }) {
         return;
       }
 
-      const dates = shifts.map(s => s.date);
+      const latestShiftsMap = {};
+      shifts.forEach(shift => {
+        if (!latestShiftsMap[shift.date]) {
+          latestShiftsMap[shift.date] = shift;
+        }
+      });
+      const latestShifts = Object.values(latestShiftsMap).sort((a, b) => a.date.localeCompare(b.date));
+
+      const dates = latestShifts.map(s => s.date);
       const { data: finalShifts, error: finalError } = await supabase
         .from('final_shifts')
         .select('date')
@@ -67,7 +96,7 @@ function StaffShiftEdit({ onBack }) {
       }
 
       const createdDates = new Set(finalShifts?.map(fs => fs.date) || []);
-      const editableShifts = shifts.filter(shift => !createdDates.has(shift.date));
+      const editableShifts = latestShifts.filter(shift => !createdDates.has(shift.date));
 
       if (editableShifts.length === 0) {
         setMessage('編集可能なシフトがありません（既にシフトが作成済みです）');
@@ -76,12 +105,18 @@ function StaffShiftEdit({ onBack }) {
       }
 
       setShiftData(editableShifts);
-      setEditingShifts(editableShifts.map(shift => ({
-        ...shift,
-        start_time: shift.start_time || '',
-        end_time: shift.end_time || '',
-        store: shift.store || ''
-      })));
+      setEditingShifts(editableShifts.map(shift => {
+        const startTime = parseTime(shift.start_time);
+        const endTime = parseTime(shift.end_time);
+        return {
+          ...shift,
+          startHour: startTime.hour,
+          startMin: startTime.min,
+          endHour: endTime.hour,
+          endMin: endTime.min,
+          remarks: shift.remarks || ''
+        };
+      }));
       setIsAuthenticated(true);
       setMessage('認証成功');
 
@@ -130,11 +165,13 @@ function StaffShiftEdit({ onBack }) {
     const updated = editingShifts.map((item) => {
       const day = getWeekday(item.date);
       if (selectedDays.includes('全て') || selectedDays.includes(day)) {
-        const newItem = { ...item };
-        if (bulkStart) newItem.start_time = bulkStart;
-        if (bulkEnd) newItem.end_time = bulkEnd;
-        if (bulkStore) newItem.store = bulkStore;
-        return newItem;
+        return {
+          ...item,
+          startHour: bulkStartHour,
+          startMin: bulkStartMin,
+          endHour: bulkEndHour,
+          endMin: bulkEndMin
+        };
       }
       return item;
     });
@@ -145,16 +182,26 @@ function StaffShiftEdit({ onBack }) {
     setLoading(true);
     try {
       for (const shift of editingShifts) {
+        const startTime = shift.startHour !== '' && shift.startMin !== ''
+          ? `${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}:00`
+          : null;
+        const endTime = shift.endHour !== '' && shift.endMin !== ''
+          ? `${String(shift.endHour).padStart(2, '0')}:${String(shift.endMin).padStart(2, '0')}:00`
+          : null;
+
+        console.log('Saving shift:', { id: shift.id, startTime, endTime, remarks: shift.remarks });
+
         const { error } = await supabase
           .from('shifts')
           .update({
-            start_time: shift.start_time,
-            end_time: shift.end_time,
-            store: shift.store
+            start_time: startTime,
+            end_time: endTime,
+            remarks: shift.remarks || null
           })
           .eq('id', shift.id);
 
         if (error) {
+          console.error('Update error:', error);
           alert(`更新に失敗しました: ${error.message}`);
           setLoading(false);
           return;
@@ -170,6 +217,7 @@ function StaffShiftEdit({ onBack }) {
       setMessage('');
 
     } catch (error) {
+      console.error('Save error:', error);
       alert(`エラーが発生しました: ${error.message}`);
     } finally {
       setLoading(false);
@@ -241,23 +289,30 @@ function StaffShiftEdit({ onBack }) {
 
   return (
     <div className="login-wrapper">
-      <div className="login-card" style={{ width: '800px', maxWidth: '95vw' }}>
-        <h2>シフト変更</h2>
-        <p>管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{name}</strong></p>
-        <p style={{ fontSize: '0.9rem', color: '#666' }}>
+      <div className="login-card" style={{ width: isMobile ? '95vw' : '800px', maxWidth: '95vw' }}>
+        <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.5rem' }}>シフト変更</h2>
+        <p style={{ fontSize: isMobile ? '0.85rem' : '1rem' }}>
+          管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{name}</strong>
+        </p>
+        <p style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', color: '#666' }}>
           編集可能なシフト: {editingShifts.length}件
         </p>
 
         <div style={{
-          border: '1px solid #ddd',
+          border: '2px solid #2196F3',
           borderRadius: '8px',
-          padding: '1rem',
+          padding: isMobile ? '0.8rem' : '1rem',
           marginBottom: '1rem',
-          backgroundColor: '#f9f9f9'
+          backgroundColor: '#e3f2fd'
         }}>
-          <h4 style={{ margin: '0 0 1rem 0' }}>一括適用</h4>
+          <h4 style={{ margin: '0 0 1rem 0', fontSize: isMobile ? '0.95rem' : '1rem', color: '#1976D2', fontWeight: 'bold' }}>一括設定</h4>
           
-          <div style={{ display: 'flex', overflowX: 'auto', gap: '0.5rem', paddingBottom: '1rem' }}>
+          <div style={{ 
+            display: 'flex', 
+            overflowX: 'auto', 
+            gap: isMobile ? '0.3rem' : '0.5rem', 
+            paddingBottom: '1rem' 
+          }}>
             {['全て', '月', '火', '水', '木', '金', '土', '日'].map((day) => (
               <button
                 key={day}
@@ -265,11 +320,12 @@ function StaffShiftEdit({ onBack }) {
                 style={{
                   backgroundColor: selectedDays.includes(day) ? '#95a5a6' : getColorForDay(day),
                   color: 'white',
-                  padding: '0.5rem 1rem',
+                  padding: isMobile ? '0.4rem 0.8rem' : '0.5rem 1rem',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  fontSize: isMobile ? '0.85rem' : '1rem'
                 }}
               >
                 {day}
@@ -278,34 +334,58 @@ function StaffShiftEdit({ onBack }) {
           </div>
 
           {selectedDays.length > 0 && (
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div>
-                <label style={{ fontSize: '0.9rem' }}>開始時間：</label>
-                <input 
-                  type="time" 
-                  value={bulkStart} 
-                  onChange={(e) => setBulkStart(e.target.value)}
-                  style={{ padding: '0.25rem' }}
-                />
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: '1', minWidth: '140px' }}>
+                <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
+                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                  <select 
+                    value={bulkStartHour} 
+                    onChange={e => setBulkStartHour(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                  >
+                    <option value="">時</option>
+                    {[...Array(37)].map((_, h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                  <select 
+                    value={bulkStartMin} 
+                    onChange={e => setBulkStartMin(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                  >
+                    <option value="">分</option>
+                    {[...Array(60)].map((_, m) => (
+                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label style={{ fontSize: '0.9rem' }}>終了時間：</label>
-                <input 
-                  type="time" 
-                  value={bulkEnd} 
-                  onChange={(e) => setBulkEnd(e.target.value)}
-                  style={{ padding: '0.25rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.9rem' }}>店舗：</label>
-                <input 
-                  type="text" 
-                  value={bulkStore} 
-                  onChange={(e) => setBulkStore(e.target.value)}
-                  placeholder="店舗番号"
-                  style={{ padding: '0.25rem', width: '80px' }}
-                />
+              <div style={{ flex: '1', minWidth: '140px' }}>
+                <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
+                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                  <select 
+                    value={bulkEndHour} 
+                    onChange={e => setBulkEndHour(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                  >
+                    <option value="">時</option>
+                    {[...Array(37)].map((_, h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                  <select 
+                    value={bulkEndMin} 
+                    onChange={e => setBulkEndMin(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                  >
+                    <option value="">分</option>
+                    {[...Array(60)].map((_, m) => (
+                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <button 
                 onClick={handleBulkApply}
@@ -314,8 +394,11 @@ function StaffShiftEdit({ onBack }) {
                   color: 'white',
                   padding: '0.5rem 1rem',
                   border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: 'clamp(12px, 2vw, 14px)',
+                  fontWeight: 'bold',
+                  minWidth: '80px'
                 }}
               >
                 一括適用
@@ -325,97 +408,264 @@ function StaffShiftEdit({ onBack }) {
         </div>
 
         <div style={{
-          maxHeight: '400px',
+          maxHeight: isMobile ? '70vh' : '400px',
           overflowY: 'auto',
           border: '1px solid #ddd',
           borderRadius: '8px',
           marginBottom: '1rem'
         }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
-              <tr>
-                <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-                  日付
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                  店舗
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                  開始時間
-                </th>
-                <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                  終了時間
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          {isMobile ? (
+            <div style={{ padding: '1rem' }}>
               {editingShifts.map((shift, index) => (
-                <tr key={shift.id} style={{
-                  backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9'
-                }}>
-                  <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                    <strong>{shift.date}</strong> ({getWeekday(shift.date)})
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                    <input
-                      type="text"
-                      value={shift.store || ''}
-                      onChange={(e) => handleTimeChange(index, 'store', e.target.value)}
-                      placeholder="店舗"
+                <div 
+                  key={shift.id}
+                  style={{
+                    backgroundColor: '#e8e8e8',
+                    border: '1px solid #d0d0d0',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '1rem'
+                  }}
+                >
+                  <div style={{ 
+                    fontWeight: 'bold', 
+                    fontSize: 'clamp(14px, 3vw, 18px)',
+                    marginBottom: '0.8rem',
+                    color: '#333'
+                  }}>
+                    {shift.date}（{getWeekday(shift.date)}）
+                  </div>
+                  
+                  <div style={{ marginBottom: '0.8rem' }}>
+                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                      <select 
+                        value={shift.startHour} 
+                        onChange={e => handleTimeChange(index, 'startHour', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">時</option>
+                        {[...Array(37)].map((_, h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <select 
+                        value={shift.startMin} 
+                        onChange={e => handleTimeChange(index, 'startMin', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">分</option>
+                        {[...Array(60)].map((_, m) => (
+                          <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '0.8rem' }}>
+                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                      <select 
+                        value={shift.endHour} 
+                        onChange={e => handleTimeChange(index, 'endHour', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">時</option>
+                        {[...Array(37)].map((_, h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <select 
+                        value={shift.endMin} 
+                        onChange={e => handleTimeChange(index, 'endMin', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">分</option>
+                        {[...Array(60)].map((_, m) => (
+                          <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>備考</label>
+                    <textarea
+                      value={shift.remarks || ''}
+                      onChange={(e) => handleTimeChange(index, 'remarks', e.target.value)}
+                      placeholder="例：朝遅刻予定、早退など"
                       style={{
+                        width: '100%',
                         padding: '0.5rem',
-                        border: '1px solid #ddd',
                         borderRadius: '4px',
-                        width: '80px',
-                        textAlign: 'center'
+                        border: '2px solid #FF9800',
+                        fontSize: 'clamp(12px, 2vw, 14px)',
+                        minHeight: '60px',
+                        fontFamily: 'inherit',
+                        backgroundColor: '#FFF9E6',
+                        boxSizing: 'border-box'
                       }}
                     />
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                    <input
-                      type="time"
-                      value={shift.start_time ? shift.start_time.slice(0, 5) : ''}
-                      onChange={(e) => handleTimeChange(index, 'start_time', e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        width: '120px'
-                      }}
-                    />
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                    <input
-                      type="time"
-                      value={shift.end_time ? shift.end_time.slice(0, 5) : ''}
-                      onChange={(e) => handleTimeChange(index, 'end_time', e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
-                        width: '120px'
-                      }}
-                    />
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
+                <tr>
+                  <th style={{ 
+                    padding: '0.75rem', 
+                    textAlign: 'left', 
+                    borderBottom: '1px solid #ddd',
+                    minWidth: '140px'
+                  }}>
+                    日付
+                  </th>
+                  <th style={{ 
+                    padding: '0.75rem', 
+                    textAlign: 'center', 
+                    borderBottom: '1px solid #ddd',
+                    minWidth: '180px'
+                  }}>
+                    開始時間
+                  </th>
+                  <th style={{ 
+                    padding: '0.75rem', 
+                    textAlign: 'center', 
+                    borderBottom: '1px solid #ddd',
+                    minWidth: '180px'
+                  }}>
+                    終了時間
+                  </th>
+                  <th style={{ 
+                    padding: '0.75rem', 
+                    textAlign: 'left', 
+                    borderBottom: '1px solid #ddd',
+                    backgroundColor: '#FFF9E6',
+                    minWidth: '200px'
+                  }}>
+                    備考
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {editingShifts.map((shift, index) => (
+                  <tr key={shift.id} style={{
+                    backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9'
+                  }}>
+                    <td style={{ 
+                      padding: '0.75rem', 
+                      borderBottom: '1px solid #eee' 
+                    }}>
+                      <strong>{shift.date}</strong> ({getWeekday(shift.date)})
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem', 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #eee' 
+                    }}>
+                      <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', justifyContent: 'center' }}>
+                        <select 
+                          value={shift.startHour} 
+                          onChange={e => handleTimeChange(index, 'startHour', e.target.value)}
+                          style={{ padding: '0.4rem', fontSize: '0.9rem', width: '70px' }}
+                        >
+                          <option value="">時</option>
+                          {[...Array(37)].map((_, h) => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span>:</span>
+                        <select 
+                          value={shift.startMin} 
+                          onChange={e => handleTimeChange(index, 'startMin', e.target.value)}
+                          style={{ padding: '0.4rem', fontSize: '0.9rem', width: '70px' }}
+                        >
+                          <option value="">分</option>
+                          {[...Array(60)].map((_, m) => (
+                            <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem', 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #eee' 
+                    }}>
+                      <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', justifyContent: 'center' }}>
+                        <select 
+                          value={shift.endHour} 
+                          onChange={e => handleTimeChange(index, 'endHour', e.target.value)}
+                          style={{ padding: '0.4rem', fontSize: '0.9rem', width: '70px' }}
+                        >
+                          <option value="">時</option>
+                          {[...Array(37)].map((_, h) => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                        <span>:</span>
+                        <select 
+                          value={shift.endMin} 
+                          onChange={e => handleTimeChange(index, 'endMin', e.target.value)}
+                          style={{ padding: '0.4rem', fontSize: '0.9rem', width: '70px' }}
+                        >
+                          <option value="">分</option>
+                          {[...Array(60)].map((_, m) => (
+                            <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td style={{ 
+                      padding: '0.75rem', 
+                      borderBottom: '1px solid #eee',
+                      backgroundColor: '#FFF9E6'
+                    }}>
+                      <textarea
+                        value={shift.remarks || ''}
+                        onChange={(e) => handleTimeChange(index, 'remarks', e.target.value)}
+                        placeholder="特別な事情があれば記入"
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          padding: '0.5rem',
+                          borderRadius: '4px',
+                          border: '2px solid #FF9800',
+                          minHeight: '50px',
+                          fontFamily: 'inherit',
+                          resize: 'none'
+                        }}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          justifyContent: 'center',
+          flexWrap: isMobile ? 'wrap' : 'nowrap'
+        }}>
           <button 
             onClick={handleSave}
             disabled={loading}
             style={{
               backgroundColor: '#4CAF50',
               color: 'white',
-              padding: '0.75rem 2rem',
+              padding: isMobile ? '0.6rem 1.5rem' : '0.75rem 2rem',
               border: 'none',
               borderRadius: '4px',
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.6 : 1,
-              fontSize: '1rem'
+              fontSize: isMobile ? '0.95rem' : '1rem'
             }}
           >
             {loading ? '保存中...' : '保存'}
@@ -426,11 +676,11 @@ function StaffShiftEdit({ onBack }) {
             style={{
               backgroundColor: '#607D8B',
               color: 'white',
-              padding: '0.75rem 2rem',
+              padding: isMobile ? '0.6rem 1.5rem' : '0.75rem 2rem',
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '1rem'
+              fontSize: isMobile ? '0.95rem' : '1rem'
             }}
           >
             メニューに戻る

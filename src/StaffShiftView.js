@@ -170,13 +170,11 @@ function StaffShiftView({ onBack }) {
     return days[date.getDay()];
   };
 
+  // 36時間表記対応：0:00～35:00まで1時間刻みで生成
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 0; hour < 24; hour++) {
+    for (let hour = 0; hour < 36; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      slots.push(`${hour.toString().padStart(2, '0')}:15`);
-      slots.push(`${hour.toString().padStart(2, '0')}:30`);
-      slots.push(`${hour.toString().padStart(2, '0')}:45`);
     }
     return slots;
   };
@@ -191,10 +189,21 @@ function StaffShiftView({ onBack }) {
     if (isOffDay(shift)) return false;
 
     const startMinutes = timeToMinutes(shift.start_time);
-    const endMinutes = timeToMinutes(shift.end_time);
+    let endMinutes = timeToMinutes(shift.end_time);
     const checkMinutes = timeToMinutes(timeStr);
 
-    return checkMinutes >= startMinutes && checkMinutes < endMinutes;
+    // 翌日にまたがる場合の処理
+    if (endMinutes < startMinutes) {
+      endMinutes += 24 * 60;
+    }
+
+    // チェック時刻も24時以降なら24*60を加算
+    let adjustedCheckMinutes = checkMinutes;
+    if (checkMinutes < startMinutes && endMinutes >= 24 * 60) {
+      adjustedCheckMinutes += 24 * 60;
+    }
+
+    return adjustedCheckMinutes >= startMinutes && adjustedCheckMinutes < endMinutes;
   };
 
   const isOffDay = (shift) => {
@@ -510,23 +519,20 @@ function StaffShiftView({ onBack }) {
                   }}>
                     店舗
                   </th>
-                  {timeSlots.map((timeSlot, idx) => {
-                    const isHourMark = timeSlot.endsWith(':00');
-                    return (
-                      <th key={timeSlot} style={{
-                        padding: '0.25rem',
-                        textAlign: 'center',
-                        borderBottom: '2px solid #999',
-                        borderRight: isHourMark ? '1px solid #ccc' : '1px solid #e8e8e8',
-                        minWidth: '32px',
-                        fontSize: isHourMark ? '0.75rem' : '0.65rem',
-                        fontWeight: isHourMark ? 'bold' : 'normal',
-                        backgroundColor: '#f5f5f5'
-                      }}>
-                        {isHourMark ? timeSlot : timeSlot.slice(3)}
-                      </th>
-                    );
-                  })}
+                  {timeSlots.map((timeSlot) => (
+                    <th key={timeSlot} style={{
+                      padding: '0.25rem',
+                      textAlign: 'center',
+                      borderBottom: '2px solid #999',
+                      borderRight: '1px solid #ccc',
+                      minWidth: '50px',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      backgroundColor: '#f5f5f5'
+                    }}>
+                      {timeSlot}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -558,13 +564,12 @@ function StaffShiftView({ onBack }) {
                     }}>
                       {shift.store || '-'}
                     </td>
-                    {timeSlots.map((timeSlot, idx) => {
-                      const isHourMark = timeSlot.endsWith(':00');
+                    {timeSlots.map((timeSlot) => {
                       const isWorking = isWorkingAtTime(shift, timeSlot);
                       return (
                         <td key={timeSlot} style={{
                           borderBottom: '1px solid #ddd',
-                          borderRight: isHourMark ? '1px solid #ccc' : '1px solid #e8e8e8',
+                          borderRight: '1px solid #ccc',
                           textAlign: 'center',
                           backgroundColor: isWorking ? '#4CAF50' : (index % 2 === 0 ? 'white' : '#f9f9f9'),
                           transition: 'all 0.3s ease',

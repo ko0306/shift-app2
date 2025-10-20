@@ -6,6 +6,7 @@ import ManagerShiftView from './ManagerShiftView';
 import StaffShiftEdit from './StaffShiftEdit';
 import ManagerAttendance from './ManagerAttendance';
 import StaffWorkHours from './StaffWorkHours';
+import ClockInInput from './ClockInInput';
 import { supabase } from './supabaseClient';
 import './App.css';
 
@@ -20,8 +21,10 @@ function App() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [shiftTimes, setShiftTimes] = useState([]);
-  const [bulkStart, setBulkStart] = useState('');
-  const [bulkEnd, setBulkEnd] = useState('');
+  const [bulkStartHour, setBulkStartHour] = useState('');
+  const [bulkStartMin, setBulkStartMin] = useState('');
+  const [bulkEndHour, setBulkEndHour] = useState('');
+  const [bulkEndMin, setBulkEndMin] = useState('');
   const [selectedDays, setSelectedDays] = useState([]);
   const [managerAuth, setManagerAuth] = useState(false);
   const [managerPass, setManagerPass] = useState('');
@@ -35,8 +38,10 @@ function App() {
     setStartDate('');
     setEndDate('');
     setShiftTimes([]);
-    setBulkStart('');
-    setBulkEnd('');
+    setBulkStartHour('');
+    setBulkStartMin('');
+    setBulkEndHour('');
+    setBulkEndMin('');
     setSelectedDays([]);
     setManagerPass('');
     setManagerPassError('');
@@ -90,13 +95,30 @@ function App() {
     if (selectedRole === 'staff') setCurrentStep('');
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!managerNumber.trim()) {
       alert('管理番号を入力してください');
       return;
     }
     if (!startDate || !endDate || startDate > endDate) {
       alert('正しい開始日・終了日を入力してください');
+      return;
+    }
+
+    // 管理番号の存在確認
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('manager_number')
+        .eq('manager_number', managerNumber)
+        .single();
+
+      if (error || !data) {
+        alert('管理番号が存在しません。');
+        return;
+      }
+    } catch (err) {
+      alert('管理番号が存在しません。');
       return;
     }
 
@@ -114,7 +136,14 @@ function App() {
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
-      dates.push({ date: `${yyyy}-${mm}-${dd}`, start: '', end: '' });
+      dates.push({ 
+        date: `${yyyy}-${mm}-${dd}`, 
+        startHour: '', 
+        startMin: '', 
+        endHour: '', 
+        endMin: '', 
+        remarks: '' 
+      });
       d.setDate(d.getDate() + 1);
     }
 
@@ -138,7 +167,13 @@ function App() {
     const updated = shiftTimes.map(item => {
       const day = getWeekday(item.date);
       if (selectedDays.includes('全て') || selectedDays.includes(day)) {
-        return { ...item, start: bulkStart, end: bulkEnd };
+        return { 
+          ...item, 
+          startHour: bulkStartHour, 
+          startMin: bulkStartMin, 
+          endHour: bulkEndHour, 
+          endMin: bulkEndMin 
+        };
       }
       return item;
     });
@@ -170,25 +205,29 @@ function App() {
   const handleSubmit = async () => {
     try {
       for (const shift of shiftTimes) {
+        const startTime = shift.startHour !== '' && shift.startMin !== '' 
+          ? `${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}` 
+          : '';
+        const endTime = shift.endHour !== '' && shift.endMin !== '' 
+          ? `${String(shift.endHour).padStart(2, '0')}:${String(shift.endMin).padStart(2, '0')}` 
+          : '';
+        
         const { error } = await supabase
           .from('shifts')
           .insert([{
             manager_number: managerNumber,
             date: shift.date,
-            start_time: shift.start,
-            end_time: shift.end,
+            start_time: startTime,
+            end_time: endTime,
+            remarks: shift.remarks,
           }]);
         if (error) throw error;
       }
 
       alert('シフトを保存しました！');
       setCurrentStep('');
-      setRole('');
-      setIsLoggedIn(false);
-      setId('');
-      setPassword('');
+      setRole('staff');
       resetAllInputs();
-      setNavigationHistory([]);
     } catch (error) {
       alert(`保存中にエラーが発生しました: ${error.message}`);
     }
@@ -258,11 +297,30 @@ function App() {
         <div className="login-card" style={{ position: 'relative' }}>
           <BackButton />
           <h2>役職を選択してください</h2>
-          <div className="button-row">
+          <div className="button-row" style={{ flexDirection: 'column', gap: '1rem' }}>
             <button onClick={() => selectRole('staff')} style={{ backgroundColor: '#1976D2' }}>アルバイト</button>
             <button onClick={() => selectRole('manager')} style={{ backgroundColor: '#1565C0' }}>店長</button>
+            <button onClick={() => {
+              pushToHistory({
+                role: '',
+                currentStep: '',
+                managerAuth: false,
+                managerStep: '',
+                isLoggedIn: true
+              });
+              setRole('clockin');
+            }} style={{ backgroundColor: '#00BCD4' }}>退勤入力</button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (role === 'clockin') {
+    return (
+      <div style={{ position: 'relative' }}>
+        <BackButton />
+        <ClockInInput onBack={() => setRole('')} />
       </div>
     );
   }
@@ -373,7 +431,11 @@ function App() {
     return (
       <div style={{ position: 'relative' }}>
         <BackButton />
-        <ManagerCreate />
+        <ManagerCreate onNavigate={(page) => {
+          if (page === 'staff') {
+            setManagerStep('');
+          }
+        }} />
       </div>
     );
   }
@@ -444,7 +506,7 @@ function App() {
   if (role === 'staff' && currentStep === 'shiftInput') {
     return (
       <div className="login-wrapper">
-        <div className="login-card" style={{ position: 'relative' }}>
+        <div className="login-card shift-input-card" style={{ position: 'relative' }}>
           <BackButton />
           <h2>シフト入力</h2>
           <p>管理番号: <strong>{managerNumber}</strong></p>
@@ -457,6 +519,7 @@ function App() {
                 style={{
                   backgroundColor: selectedDays.includes(day) ? '#95a5a6' : getColorForDay(day),
                   color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                  fontSize: 'clamp(12px, 2vw, 16px)',
                 }}>
                 {day}
               </button>
@@ -464,25 +527,178 @@ function App() {
           </div>
 
           {selectedDays.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label>開始時間：</label>
-              <input type="time" value={bulkStart} onChange={e => setBulkStart(e.target.value)} />
-              <label style={{ marginLeft: '1rem' }}>終了時間：</label>
-              <input type="time" value={bulkEnd} onChange={e => setBulkEnd(e.target.value)} />
-              <button onClick={handleBulkApply} style={{ marginLeft: '1rem', backgroundColor: '#2196F3' }}>一括適用</button>
+            <div style={{ 
+              marginBottom: '1rem', 
+              padding: '1rem', 
+              backgroundColor: '#e3f2fd', 
+              borderRadius: '8px',
+              border: '2px solid #2196F3'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#1976D2' }}>一括設定</div>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1', minWidth: '140px' }}>
+                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
+                  <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                    <select 
+                      value={bulkStartHour} 
+                      onChange={e => setBulkStartHour(e.target.value)}
+                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                    >
+                      <option value="">時</option>
+                      {[...Array(37)].map((_, h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                    <select 
+                      value={bulkStartMin} 
+                      onChange={e => setBulkStartMin(e.target.value)}
+                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                    >
+                      <option value="">分</option>
+                      {[...Array(60)].map((_, m) => (
+                        <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ flex: '1', minWidth: '140px' }}>
+                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
+                  <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                    <select 
+                      value={bulkEndHour} 
+                      onChange={e => setBulkEndHour(e.target.value)}
+                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                    >
+                      <option value="">時</option>
+                      {[...Array(37)].map((_, h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                    <select 
+                      value={bulkEndMin} 
+                      onChange={e => setBulkEndMin(e.target.value)}
+                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                    >
+                      <option value="">分</option>
+                      {[...Array(60)].map((_, m) => (
+                        <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleBulkApply} 
+                  style={{ 
+                    backgroundColor: '#2196F3', 
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem',
+                    cursor: 'pointer',
+                    fontSize: 'clamp(12px, 2vw, 14px)',
+                    fontWeight: 'bold',
+                    minWidth: '80px'
+                  }}
+                >
+                  一括適用
+                </button>
+              </div>
             </div>
           )}
 
-          <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
+          <div style={{ maxHeight: '50vh', overflowY: 'auto', marginBottom: '1rem', width: '100%' }}>
             {shiftTimes.map((item, i) => (
-              <div key={item.date} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
-                <div style={{ width: '110px' }}>{item.date}（{getWeekday(item.date)}）</div>
-                <input type="time" value={item.start} onChange={e => handleTimeChange(i, 'start', e.target.value)} />
-                <input type="time" value={item.end} onChange={e => handleTimeChange(i, 'end', e.target.value)} />
+              <div key={item.date} style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '0.5rem', 
+                marginBottom: '1.5rem', 
+                padding: '1rem',
+                backgroundColor: '#e8e8e8',
+                borderRadius: '8px',
+                border: '1px solid #d0d0d0'
+              }}>
+                <div style={{ fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' }}>
+                  {item.date}（{getWeekday(item.date)}）
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1', minWidth: '140px' }}>
+                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                      <select 
+                        value={item.startHour} 
+                        onChange={e => handleTimeChange(i, 'startHour', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">時</option>
+                        {[...Array(37)].map((_, h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <select 
+                        value={item.startMin} 
+                        onChange={e => handleTimeChange(i, 'startMin', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">分</option>
+                        {[...Array(60)].map((_, m) => (
+                          <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ flex: '1', minWidth: '140px' }}>
+                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                      <select 
+                        value={item.endHour} 
+                        onChange={e => handleTimeChange(i, 'endHour', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">時</option>
+                        {[...Array(37)].map((_, h) => (
+                          <option key={h} value={h}>{h}</option>
+                        ))}
+                      </select>
+                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <select 
+                        value={item.endMin} 
+                        onChange={e => handleTimeChange(i, 'endMin', e.target.value)}
+                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      >
+                        <option value="">分</option>
+                        {[...Array(60)].map((_, m) => (
+                          <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>備考</label>
+                  <textarea 
+                    value={item.remarks} 
+                    onChange={e => handleTimeChange(i, 'remarks', e.target.value)}
+                    placeholder="例：朝遅刻予定、早退など"
+                    style={{ 
+                      width: '100%', 
+                      padding: '0.5rem', 
+                      borderRadius: '4px', 
+                      border: '2px solid #FF9800',
+                      fontSize: 'clamp(12px, 2vw, 14px)',
+                      minHeight: '60px',
+                      fontFamily: 'inherit',
+                      backgroundColor: '#FFF9E6'
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
-          <button onClick={handleSubmit} style={{ backgroundColor: '#1976D2' }}>送信</button>
+          <button onClick={handleSubmit} style={{ backgroundColor: '#1976D2', width: '100%', fontSize: 'clamp(14px, 3vw, 18px)', padding: '0.75rem' }}>送信</button>
         </div>
       </div>
     );

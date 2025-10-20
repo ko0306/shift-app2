@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 
+// 日付文字列を正確に取得する関数（タイムゾーン対応）
+const getDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // ----------------------------------------------------------------------
 // 共通ヘルパー関数
 // ----------------------------------------------------------------------
@@ -62,6 +70,27 @@ const formatMinutes = (totalMinutes) => {
     return `${hours}時間${minutes}分`;
 };
 
+// 時刻を24時以降の形式で表示（例: 25:00, 26:30）
+const formatExtendedTime = (timeStr, workDate) => {
+  if (!timeStr || !workDate) return timeStr;
+  
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const workDateObj = new Date(workDate + 'T00:00:00');
+  const currentDate = new Date();
+  currentDate.setHours(hours, minutes, 0, 0);
+  
+  // 勤務開始日から何日経過しているか
+  const daysDiff = Math.floor((currentDate - workDateObj) / (1000 * 60 * 60 * 24));
+  
+  // 日をまたいでいる場合（深夜帯）は時間に24を加算
+  if (hours < 12 && daysDiff >= 0) { 
+    const extendedHours = hours + 24;
+    return `${extendedHours}:${String(minutes).padStart(2, '0')}`;
+  }
+  
+  return timeStr;
+};
+
 // ----------------------------------------------------------------------
 // TimePeriodEditor (集計時間帯設定コンポーネント)
 // ----------------------------------------------------------------------
@@ -71,9 +100,12 @@ const TimePeriodEditor = ({ timePeriods, setTimePeriods, onClose }) => {
     const [nextId, setNextId] = useState(Math.max(0, ...timePeriods.map(p => p.id)) + 1);
 
     const handleUpdate = (id, field, value) => {
-        setCurrentPeriods(prev => prev.map(p => 
-            p.id === id ? { ...p, [field]: value } : p
-        ));
+        setCurrentPeriods(prev => {
+            const updated = prev.map(p => 
+                p.id === id ? { ...p, [field]: value } : p
+            );
+            return [...updated];
+        });
     };
 
     const handleDelete = (id) => {
@@ -111,62 +143,95 @@ const TimePeriodEditor = ({ timePeriods, setTimePeriods, onClose }) => {
         <div style={{ padding: '1.5rem', border: '1px solid #ccc', borderRadius: '8px', backgroundColor: '#f9f9f9', marginBottom: '2rem' }}>
             <h3 style={{ marginTop: 0 }}>集計時間帯の編集</h3>
             
-            <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1rem' }}>
+            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem' }}>
                 {currentPeriods.map((p) => (
-                    <div key={p.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem', padding: '0.5rem', borderBottom: '1px dotted #ddd' }}>
-                        <input
-                            type="text"
-                            value={p.label}
-                            onChange={(e) => handleUpdate(p.id, 'label', e.target.value)}
-                            placeholder="ラベル"
-                            style={{ flex: 1, padding: '0.25rem' }}
-                        />
-                        <input
-                            type="time"
-                            value={p.start}
-                            onChange={(e) => handleUpdate(p.id, 'start', e.target.value)}
-                            style={{ width: '80px', padding: '0.25rem' }}
-                            step="60"
-                        />
-                        <span>〜</span>
-                        <input
-                            type="time"
-                            value={p.end}
-                            onChange={(e) => handleUpdate(p.id, 'end', e.target.value)}
-                            style={{ width: '80px', padding: '0.25rem' }}
-                            step="60"
-                        />
-                        <button onClick={() => handleDelete(p.id)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#F44336', color: 'white', border: 'none', borderRadius: '4px' }}>
+                    <div key={p.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.75rem', padding: '0.75rem', borderBottom: '2px solid #ddd', backgroundColor: '#fff' }}>
+                        <div style={{ flex: 5, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <label style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>ラベル名</label>
+                            <input
+                                type="text"
+                                value={p.label || ''}
+                                onChange={(e) => handleUpdate(p.id, 'label', e.target.value)}
+                                placeholder="例: 午前時間"
+                                style={{ 
+                                    padding: '0.5rem', 
+                                    fontSize: '1rem',
+                                    border: '2px solid #2196F3',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                }}
+                            />
+                        </div>
+                        <div style={{ flex: 2, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', color: '#666' }}>開始</label>
+                                <input
+                                    type="time"
+                                    value={p.start}
+                                    onChange={(e) => handleUpdate(p.id, 'start', e.target.value)}
+                                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
+                                    step="60"
+                                />
+                            </div>
+                            <span style={{ marginTop: '1.2rem', fontSize: '0.8rem' }}>〜</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                                <label style={{ fontSize: '0.75rem', color: '#666' }}>終了</label>
+                                <input
+                                    type="time"
+                                    value={p.end}
+                                    onChange={(e) => handleUpdate(p.id, 'end', e.target.value)}
+                                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
+                                    step="60"
+                                />
+                            </div>
+                        </div>
+                        <button onClick={() => handleDelete(p.id)} style={{ padding: '0.4rem', backgroundColor: '#F44336', color: 'white', border: 'none', borderRadius: '4px', marginTop: '1.2rem', cursor: 'pointer', width: '45px', fontSize: '0.85rem' }}>
                             削除
                         </button>
                     </div>
                 ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
-                <input
-                    type="text"
-                    value={newPeriod.label}
-                    onChange={(e) => setNewPeriod({ ...newPeriod, label: e.target.value })}
-                    placeholder="新しいラベル"
-                    style={{ flex: 1, padding: '0.25rem' }}
-                />
-                <input
-                    type="time"
-                    value={newPeriod.start}
-                    onChange={(e) => setNewPeriod({ ...newPeriod, start: e.target.value })}
-                    style={{ width: '80px', padding: '0.25rem' }}
-                    step="60"
-                />
-                <span>〜</span>
-                <input
-                    type="time"
-                    value={newPeriod.end}
-                    onChange={(e) => setNewPeriod({ ...newPeriod, end: e.target.value })}
-                    style={{ width: '80px', padding: '0.25rem' }}
-                    step="60"
-                />
-                <button onClick={handleAdd} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1rem', borderTop: '2px solid #4CAF50', paddingTop: '1rem', backgroundColor: '#f0f8f0', padding: '1rem', borderRadius: '4px' }}>
+                <div style={{ flex: 5, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <label style={{ fontSize: '0.85rem', color: '#4CAF50', fontWeight: 'bold' }}>新しいラベル名</label>
+                    <input
+                        type="text"
+                        value={newPeriod.label}
+                        onChange={(e) => setNewPeriod({ ...newPeriod, label: e.target.value })}
+                        placeholder="例: 深夜時間"
+                        style={{ 
+                            padding: '0.5rem', 
+                            fontSize: '1rem',
+                            border: '2px solid #4CAF50',
+                            borderRadius: '4px'
+                        }}
+                    />
+                </div>
+                <div style={{ flex: 2, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', color: '#666' }}>開始</label>
+                        <input
+                            type="time"
+                            value={newPeriod.start}
+                            onChange={(e) => setNewPeriod({ ...newPeriod, start: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
+                            step="60"
+                        />
+                    </div>
+                    <span style={{ marginTop: '1.2rem', fontSize: '0.8rem' }}>〜</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', color: '#666' }}>終了</label>
+                        <input
+                            type="time"
+                            value={newPeriod.end}
+                            onChange={(e) => setNewPeriod({ ...newPeriod, end: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem', fontSize: '0.9rem' }}
+                            step="60"
+                        />
+                    </div>
+                </div>
+                <button onClick={handleAdd} style={{ padding: '0.4rem', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', width: '45px', fontSize: '0.85rem', marginTop: '1.2rem' }}>
                     追加
                 </button>
             </div>
@@ -192,7 +257,7 @@ const SummaryView = ({ userMap, availableDates, onBackToCalendar }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [filter, setFilter] = useState('monthly'); 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedPeriod, setSelectedPeriod] = useState(new Date().toISOString().split('T')[0].substring(0, 7)); 
+  const [selectedPeriod, setSelectedPeriod] = useState(getDateString(new Date()).substring(0, 7)); 
   const [selectedUser, setSelectedUser] = useState(''); 
   const [loading, setLoading] = useState(true);
   const [isEditingPeriods, setIsEditingPeriods] = useState(false);
@@ -214,7 +279,7 @@ const SummaryView = ({ userMap, availableDates, onBackToCalendar }) => {
   }, [userMap]);
 
   const availableYears = useMemo(() => {
-    const years = new Set(availableDates.map(d => new Date(d).getFullYear().toString()));
+    const years = new Set(availableDates.map(d => new Date(d + 'T00:00:00').getFullYear().toString()));
     const sortedYears = Array.from(years).sort((a, b) => b.localeCompare(a));
     
     const currentYear = new Date().getFullYear().toString();
@@ -265,7 +330,6 @@ const SummaryView = ({ userMap, availableDates, onBackToCalendar }) => {
 
       if (error) {
         console.error('集計データ取得エラー:', error);
-        alert('集計データの取得に失敗しました');
         return;
       }
       setAttendanceRecords(data || []);
@@ -584,7 +648,6 @@ function ManagerAttendance({ onBack }) {
 
       if (shiftError) {
         console.error('シフトデータ取得エラー:', shiftError);
-        alert('シフトデータの取得に失敗しました');
         setLoading(false);
         return;
       }
@@ -617,12 +680,13 @@ function ManagerAttendance({ onBack }) {
           name: userMap[shift.manager_number] || `管理番号: ${shift.manager_number}`,
           scheduled_start: trimTime(shift.start_time),
           scheduled_end: trimTime(shift.end_time),
-          actual_start: existing?.actual_start ? trimTime(existing.actual_start) : trimTime(shift.start_time),
-          actual_end: existing?.actual_end ? trimTime(existing.actual_end) : trimTime(shift.end_time),
+          actual_start: existing?.actual_start ? trimTime(existing.actual_start) : '',
+          actual_end: existing?.actual_end ? trimTime(existing.actual_end) : '',
           break_minutes: existing?.break_minutes || 0,
           store: shift.store || '',
           is_off: isOff,
-          attendance_id: existing?.id || null
+          attendance_id: existing?.id || null,
+          work_date: date
         };
       });
 
@@ -634,7 +698,6 @@ function ManagerAttendance({ onBack }) {
       setCurrentView('attendance');
     } catch (error) {
       console.error('データ取得エラー:', error);
-      alert('エラーが発生しました');
     } finally {
       setLoading(false);
     }
@@ -653,21 +716,24 @@ function ManagerAttendance({ onBack }) {
     setLoading(true);
     try {
       for (const record of attendanceData) {
+        const actualStart = record.actual_start && record.actual_start !== '' ? record.actual_start : null;
+        const actualEnd = record.actual_end && record.actual_end !== '' ? record.actual_end : null;
+        
+        if (!actualStart && !actualEnd) {
+          continue;
+        }
+        
         const workMinutes = calculateWorkMinutes(
-            record.actual_start, 
-            record.actual_end, 
+            actualStart, 
+            actualEnd, 
             record.break_minutes
         );
-        
-        if (workMinutes === 0 && !record.actual_start && !record.actual_end) {
-             continue;
-        }
 
         const attendanceRecord = {
           date: selectedDate,
           manager_number: record.manager_number,
-          actual_start: record.actual_start, 
-          actual_end: record.actual_end,     
+          actual_start: actualStart, 
+          actual_end: actualEnd,     
           break_minutes: record.break_minutes || 0,
           work_minutes: workMinutes, 
           store: record.store
@@ -681,18 +747,18 @@ function ManagerAttendance({ onBack }) {
 
           if (error) {
             console.error('更新エラー:', error);
-            alert(`${record.name} の更新に失敗しました`);
+            alert(`${record.name} の更新に失敗しました: ${error.message}`);
             setLoading(false);
             return;
           }
-        } else if (workMinutes > 0 || (record.actual_start && record.actual_end)) {
+        } else {
           const { error } = await supabase
             .from('attendance')
             .insert([attendanceRecord]);
 
           if (error) {
             console.error('挿入エラー:', error);
-            alert(`${record.name} の保存に失敗しました`);
+            alert(`${record.name} の保存に失敗しました: ${error.message}`);
             setLoading(false);
             return;
           }
@@ -743,7 +809,7 @@ function ManagerAttendance({ onBack }) {
     const currentDate = new Date(startDate);
 
     for (let i = 0; i < 42; i++) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = getDateString(currentDate);
       const isCurrentMonth = currentDate.getMonth() === month;
       const hasShift = availableDates.includes(dateStr);
 
@@ -769,7 +835,7 @@ function ManagerAttendance({ onBack }) {
 
   const getWeekday = (dateStr) => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T00:00:00');
     return days[date.getDay()];
   };
 
@@ -939,9 +1005,9 @@ function ManagerAttendance({ onBack }) {
     <div className="login-wrapper">
       <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
         <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-          <button onClick={() => changeDate(-1)}>◀</button>
+          <button onClick={() => changeDate(-1)} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>◀</button>
           {selectedDate} ({getWeekday(selectedDate)})
-          <button onClick={() => changeDate(1)}>▶</button>
+          <button onClick={() => changeDate(1)} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>▶</button>
         </h2>
         <p style={{ textAlign: 'center', color: '#666' }}>
           モード: <strong>退勤管理</strong>
@@ -997,22 +1063,22 @@ function ManagerAttendance({ onBack }) {
                       <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'center' }}>
                         {record.is_off ? <span style={{ color: '#999' }}>休み</span> : record.scheduled_end}
                       </td>
-                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'center' }}>
                         <input
                           type="time"
-                          value={record.actual_start}
+                          value={record.actual_start || ''}
                           onChange={(e) => handleTimeChange(index, 'actual_start', e.target.value)}
-                          style={{ width: '100px', padding: '0.25rem' }}
-                          step="60" 
+                          style={{ width: '90px', padding: '0.25rem', textAlign: 'center' }}
+                          step="60"
                         />
                       </td>
-                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'center' }}>
                         <input
                           type="time"
-                          value={record.actual_end}
+                          value={record.actual_end || ''}
                           onChange={(e) => handleTimeChange(index, 'actual_end', e.target.value)}
-                          style={{ width: '100px', padding: '0.25rem' }}
-                          step="60" 
+                          style={{ width: '90px', padding: '0.25rem', textAlign: 'center' }}
+                          step="60"
                         />
                       </td>
                       <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
