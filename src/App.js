@@ -105,7 +105,6 @@ function App() {
       return;
     }
 
-    // 管理番号の存在確認
     try {
       const { data, error } = await supabase
         .from('users')
@@ -281,7 +280,7 @@ function App() {
     return (
       <div className="login-wrapper">
         <form className="login-card" onSubmit={handleLogin}>
-          <h2>ログイ</h2>
+          <h2>ログイン</h2>
           <input type="text" placeholder="ログインID" value={id} onChange={e => setId(e.target.value)} required />
           <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} required />
           <button type="submit" style={{ backgroundColor: '#2196F3' }}>ログイン</button>
@@ -505,21 +504,43 @@ function App() {
 
   if (role === 'staff' && currentStep === 'shiftInput') {
     return (
-      <div className="login-wrapper">
-        <div className="login-card shift-input-card" style={{ position: 'relative' }}>
+      <div className="login-wrapper" style={{ padding: '0.5rem' }}>
+        <div className="login-card shift-input-card" style={{ 
+          position: 'relative',
+          maxWidth: '100%',
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '0.75rem',
+          paddingTop: '3rem'
+        }}>
           <BackButton />
-          <h2>シフト入力</h2>
-          <p>管理番号: <strong>{managerNumber}</strong></p>
+          <h2 style={{ marginBottom: '0.5rem', fontSize: 'clamp(18px, 4vw, 24px)' }}>シフト入力</h2>
+          <p style={{ marginBottom: '0.75rem', fontSize: 'clamp(13px, 3vw, 16px)' }}>
+            管理番号: <strong>{managerNumber}</strong>
+          </p>
 
-          <div style={{ display: 'flex', overflowX: 'auto', gap: '0.5rem', paddingBottom: '1rem' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.3rem', 
+            paddingBottom: '0.75rem',
+            flexWrap: 'nowrap',
+            justifyContent: 'space-between'
+          }}>
             {['全て', '月', '火', '水', '木', '金', '土', '日'].map((day) => (
               <button
                 key={day}
                 onClick={() => toggleSelectedDay(day)}
                 style={{
                   backgroundColor: selectedDays.includes(day) ? '#95a5a6' : getColorForDay(day),
-                  color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '6px', cursor: 'pointer',
-                  fontSize: 'clamp(12px, 2vw, 16px)',
+                  color: 'white', 
+                  padding: '0.4rem 0.2rem', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  cursor: 'pointer',
+                  fontSize: 'clamp(10px, 2.2vw, 12px)',
+                  whiteSpace: 'nowrap',
+                  flex: '1',
+                  minWidth: 0
                 }}>
                 {day}
               </button>
@@ -528,32 +549,57 @@ function App() {
 
           {selectedDays.length > 0 && (
             <div style={{ 
-              marginBottom: '1rem', 
-              padding: '1rem', 
+              marginBottom: '0.75rem', 
+              padding: '0.75rem', 
               backgroundColor: '#e3f2fd', 
               borderRadius: '8px',
               border: '2px solid #2196F3'
             }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#1976D2' }}>一括設定</div>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                <div style={{ flex: '1', minWidth: '140px' }}>
-                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
-                  <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+              <div style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '0.5rem', 
+                color: '#1976D2', 
+                fontSize: 'clamp(13px, 3vw, 14px)' 
+              }}>
+                一括設定
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ width: '100%' }}>
+                  <label style={{ 
+                    fontSize: 'clamp(12px, 2.5vw, 13px)', 
+                    display: 'block', 
+                    marginBottom: '0.25rem' 
+                  }}>
+                    開始時間
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                     <select 
                       value={bulkStartHour} 
                       onChange={e => setBulkStartHour(e.target.value)}
-                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      style={{ 
+                        flex: 1, 
+                        padding: '0.5rem', 
+                        fontSize: 'clamp(12px, 3vw, 14px)',
+                        minWidth: 0,
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <option value="">時</option>
                       {[...Array(37)].map((_, h) => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                    <span style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>:</span>
                     <select 
                       value={bulkStartMin} 
                       onChange={e => setBulkStartMin(e.target.value)}
-                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      style={{ 
+                        flex: 1, 
+                        padding: '0.5rem', 
+                        fontSize: 'clamp(12px, 3vw, 14px)',
+                        minWidth: 0,
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <option value="">分</option>
                       {[...Array(60)].map((_, m) => (
@@ -562,24 +608,42 @@ function App() {
                     </select>
                   </div>
                 </div>
-                <div style={{ flex: '1', minWidth: '140px' }}>
-                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
-                  <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                <div style={{ width: '100%' }}>
+                  <label style={{ 
+                    fontSize: 'clamp(12px, 2.5vw, 13px)', 
+                    display: 'block', 
+                    marginBottom: '0.25rem' 
+                  }}>
+                    終了時間
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                     <select 
                       value={bulkEndHour} 
                       onChange={e => setBulkEndHour(e.target.value)}
-                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      style={{ 
+                        flex: 1, 
+                        padding: '0.5rem', 
+                        fontSize: 'clamp(12px, 3vw, 14px)',
+                        minWidth: 0,
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <option value="">時</option>
                       {[...Array(37)].map((_, h) => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                    <span style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>:</span>
                     <select 
                       value={bulkEndMin} 
                       onChange={e => setBulkEndMin(e.target.value)}
-                      style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                      style={{ 
+                        flex: 1, 
+                        padding: '0.5rem', 
+                        fontSize: 'clamp(12px, 3vw, 14px)',
+                        minWidth: 0,
+                        boxSizing: 'border-box'
+                      }}
                     >
                       <option value="">分</option>
                       {[...Array(60)].map((_, m) => (
@@ -595,11 +659,11 @@ function App() {
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
-                    padding: '0.5rem 1rem',
+                    padding: '0.6rem 1rem',
                     cursor: 'pointer',
-                    fontSize: 'clamp(12px, 2vw, 14px)',
+                    fontSize: 'clamp(13px, 3vw, 14px)',
                     fontWeight: 'bold',
-                    minWidth: '80px'
+                    width: '100%'
                   }}
                 >
                   一括適用
@@ -608,40 +672,68 @@ function App() {
             </div>
           )}
 
-          <div style={{ maxHeight: '50vh', overflowY: 'auto', marginBottom: '1rem', width: '100%' }}>
+          <div style={{ 
+            maxHeight: '50vh', 
+            overflowY: 'auto', 
+            marginBottom: '0.75rem', 
+            width: '100%',
+            WebkitOverflowScrolling: 'touch'
+          }}>
             {shiftTimes.map((item, i) => (
               <div key={item.date} style={{ 
                 display: 'flex', 
                 flexDirection: 'column',
                 gap: '0.5rem', 
-                marginBottom: '1.5rem', 
-                padding: '1rem',
+                marginBottom: '0.75rem', 
+                padding: '0.75rem',
                 backgroundColor: '#e8e8e8',
                 borderRadius: '8px',
                 border: '1px solid #d0d0d0'
               }}>
-                <div style={{ fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' }}>
+                <div style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: 'clamp(14px, 3.5vw, 16px)', 
+                  marginBottom: '0.25rem' 
+                }}>
                   {item.date}（{getWeekday(item.date)}）
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <div style={{ flex: '1', minWidth: '140px' }}>
-                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>開始時間</label>
-                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ width: '100%' }}>
+                    <label style={{ 
+                      fontSize: 'clamp(12px, 2.5vw, 13px)', 
+                      display: 'block', 
+                      marginBottom: '0.25rem' 
+                    }}>
+                      開始時間
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       <select 
                         value={item.startHour} 
                         onChange={e => handleTimeChange(i, 'startHour', e.target.value)}
-                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.5rem', 
+                          fontSize: 'clamp(12px, 3vw, 14px)',
+                          minWidth: 0,
+                          boxSizing: 'border-box'
+                        }}
                       >
                         <option value="">時</option>
                         {[...Array(37)].map((_, h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
-                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <span style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>:</span>
                       <select 
                         value={item.startMin} 
                         onChange={e => handleTimeChange(i, 'startMin', e.target.value)}
-                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.5rem', 
+                          fontSize: 'clamp(12px, 3vw, 14px)',
+                          minWidth: 0,
+                          boxSizing: 'border-box'
+                        }}
                       >
                         <option value="">分</option>
                         {[...Array(60)].map((_, m) => (
@@ -650,24 +742,42 @@ function App() {
                       </select>
                     </div>
                   </div>
-                  <div style={{ flex: '1', minWidth: '140px' }}>
-                    <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem' }}>終了時間</label>
-                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                  <div style={{ width: '100%' }}>
+                    <label style={{ 
+                      fontSize: 'clamp(12px, 2.5vw, 13px)', 
+                      display: 'block', 
+                      marginBottom: '0.25rem' 
+                    }}>
+                      終了時間
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       <select 
                         value={item.endHour} 
                         onChange={e => handleTimeChange(i, 'endHour', e.target.value)}
-                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.5rem', 
+                          fontSize: 'clamp(12px, 3vw, 14px)',
+                          minWidth: 0,
+                          boxSizing: 'border-box'
+                        }}
                       >
                         <option value="">時</option>
                         {[...Array(37)].map((_, h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
-                      <span style={{ fontSize: 'clamp(12px, 2vw, 14px)' }}>:</span>
+                      <span style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>:</span>
                       <select 
                         value={item.endMin} 
                         onChange={e => handleTimeChange(i, 'endMin', e.target.value)}
-                        style={{ flex: 1, padding: '0.5rem', fontSize: 'clamp(12px, 2vw, 14px)' }}
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.5rem', 
+                          fontSize: 'clamp(12px, 3vw, 14px)',
+                          minWidth: 0,
+                          boxSizing: 'border-box'
+                        }}
                       >
                         <option value="">分</option>
                         {[...Array(60)].map((_, m) => (
@@ -678,7 +788,14 @@ function App() {
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 'clamp(12px, 2vw, 14px)', display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>備考</label>
+                  <label style={{ 
+                    fontSize: 'clamp(12px, 2.5vw, 13px)', 
+                    display: 'block', 
+                    marginBottom: '0.25rem', 
+                    fontWeight: 'bold' 
+                  }}>
+                    備考
+                  </label>
                   <textarea 
                     value={item.remarks} 
                     onChange={e => handleTimeChange(i, 'remarks', e.target.value)}
@@ -688,17 +805,34 @@ function App() {
                       padding: '0.5rem', 
                       borderRadius: '4px', 
                       border: '2px solid #FF9800',
-                      fontSize: 'clamp(12px, 2vw, 14px)',
+                      fontSize: 'clamp(12px, 3vw, 14px)',
                       minHeight: '60px',
                       fontFamily: 'inherit',
-                      backgroundColor: '#FFF9E6'
+                      backgroundColor: '#FFF9E6',
+                      boxSizing: 'border-box',
+                      resize: 'vertical'
                     }}
                   />
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={handleSubmit} style={{ backgroundColor: '#1976D2', width: '100%', fontSize: 'clamp(14px, 3vw, 18px)', padding: '0.75rem' }}>送信</button>
+          <button 
+            onClick={handleSubmit} 
+            style={{ 
+              backgroundColor: '#1976D2', 
+              width: '100%', 
+              fontSize: 'clamp(14px, 3.5vw, 16px)', 
+              padding: '0.75rem',
+              border: 'none',
+              borderRadius: '6px',
+              color: 'white',
+              fontWeight: 'bold',
+              cursor: 'pointer'
+            }}
+          >
+            送信
+          </button>
         </div>
       </div>
     );
