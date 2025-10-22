@@ -22,7 +22,6 @@ function StaffWorkHours({ onBack }) {
   const [newSlotStart, setNewSlotStart] = useState('00:00');
   const [newSlotEnd, setNewSlotEnd] = useState('00:00');
 
-  // 36時間分のタイムスロット生成
   const generateTimeOptions = () => {
     const options = [];
     for (let hour = 0; hour < 36; hour++) {
@@ -136,7 +135,6 @@ function StaffWorkHours({ onBack }) {
     return Math.ceil((dayOfMonth + firstDayOfWeek) / 7);
   };
 
-  // 36時間対応の時間比較関数
   const timeToMinutes = (timeStr) => {
     if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -150,11 +148,9 @@ function StaffWorkHours({ onBack }) {
     const startMinutes = timeToMinutes(slotStart);
     let endMinutes = timeToMinutes(slotEnd);
     
-    // 翌日にまたがる場合（例：22:00-06:00）
     if (endMinutes <= startMinutes) {
       endMinutes += 24 * 60;
       
-      // 時刻が開始時刻より前の場合、翌日とみなす
       if (timeMinutes < startMinutes) {
         return (timeMinutes + 24 * 60) >= startMinutes && (timeMinutes + 24 * 60) < endMinutes;
       }
@@ -361,11 +357,11 @@ function StaffWorkHours({ onBack }) {
 
   return (
     <div className="login-wrapper">
-      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', padding: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h2 style={{ margin: 0 }}>就労時間確認</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>年度:</label>
+          <h2 style={{ margin: 0, fontSize: 'clamp(1.2rem, 5vw, 1.5rem)' }}>就労時間確認</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: '0.9rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>年度:</label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
@@ -373,7 +369,8 @@ function StaffWorkHours({ onBack }) {
                 padding: '0.5rem',
                 border: '1px solid #ddd',
                 borderRadius: '4px',
-                fontSize: '0.9rem'
+                fontSize: '0.9rem',
+                minWidth: '80px'
               }}
             >
               {years.map(year => (
@@ -383,7 +380,7 @@ function StaffWorkHours({ onBack }) {
           </div>
         </div>
         
-        <p style={{ fontSize: '0.9rem' }}>管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{userName}</strong></p>
+        <p style={{ fontSize: 'clamp(0.75rem, 3vw, 0.9rem)', wordBreak: 'break-word' }}>管理番号: <strong>{managerNumber}</strong> | 名前: <strong>{userName}</strong></p>
 
         <div style={{
           backgroundColor: '#f9f9f9',
@@ -395,15 +392,17 @@ function StaffWorkHours({ onBack }) {
           alignItems: 'center',
           flexWrap: 'wrap'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ fontWeight: 'bold' }}>月:</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <label style={{ fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: 'clamp(0.8rem, 3vw, 1rem)' }}>月:</label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
               style={{
                 padding: '0.5rem',
                 border: '1px solid #ddd',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                minWidth: '70px',
+                fontSize: 'clamp(0.8rem, 3vw, 1rem)'
               }}
             >
               {months.map(month => (
@@ -768,31 +767,17 @@ function StaffWorkHours({ onBack }) {
                     overflow: 'auto',
                     maxHeight: '400px'
                   }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px', fontSize: '0.875rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px', fontSize: 'clamp(0.7rem, 2.5vw, 0.875rem)' }}>
                       <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5' }}>
                         <tr>
-                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-                            日付
-                          </th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                            店舗
-                          </th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                            開始時刻
-                          </th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                            終了時刻
-                          </th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                            休憩(分)
-                          </th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                            労働時間
-                          </th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', borderBottom: '1px solid #ddd', minWidth: '100px' }}>日付</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd', minWidth: '50px' }}>店舗</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd', minWidth: '60px' }}>開始時刻</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd', minWidth: '60px' }}>終了時刻</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd', minWidth: '60px' }}>休憩(分)</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #ddd', minWidth: '70px' }}>労働時間</th>
                           {group.data.some(d => d.salary) && (
-                            <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #ddd' }}>
-                              給料
-                            </th>
+                            <th style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #ddd', minWidth: '70px' }}>給料</th>
                           )}
                         </tr>
                       </thead>

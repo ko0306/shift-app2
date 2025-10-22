@@ -203,7 +203,6 @@ function ManagerCreate() {
           return false;
         }
 
-        // text型なので36時間対応のまま保存可能
         const startTime = row.isOff 
           ? null 
           : `${String(row.startHour).padStart(2, '0')}:${String(row.startMin).padStart(2, '0')}:00`;
@@ -273,16 +272,16 @@ function ManagerCreate() {
 
   if (!showTable) {
     return (
-      <div className="login-wrapper">
-        <div className="login-card">
+      <div className="login-wrapper" style={{ padding: '1rem', boxSizing: 'border-box' }}>
+        <div className="login-card" style={{ maxWidth: '500px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
           <h2>シフト作成</h2>
           <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
             シフト作成時に1年半前の古いデータは自動削除されます
           </p>
           <label>開始日:</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
           <label>終了日:</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
           <div style={{ marginTop: '1rem' }}>
             <button onClick={fetchShiftData}>次へ</button>
           </div>
@@ -293,26 +292,28 @@ function ManagerCreate() {
 
   if (isEditing) {
     return (
-      <div className="fullscreen-table">
-        <div className="login-card" style={{ position: 'relative', width: '100%', height: '100%' }}>
-          <div style={{ position: 'absolute', top: '1rem', width: 'calc(100% - 4rem)', display: 'flex', justifyContent: 'space-between', zIndex: 10 }}>
-            {currentDateIndex > 0 && (
-              <button onClick={handlePreviousDay} className="nav-button-small">
+      <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+        <div className="login-card" style={{ position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box', padding: '1rem' }}>
+          <div style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', right: '0.5rem', display: 'flex', justifyContent: 'space-between', zIndex: 10, gap: '0.5rem' }}>
+            {currentDateIndex > 0 ? (
+              <button onClick={handlePreviousDay} className="nav-button-small" style={{ flex: '0 0 auto', minWidth: '60px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', marginLeft: '3rem' }}>
                 前の日
               </button>
+            ) : (
+              <div style={{ flex: '0 0 auto', minWidth: '60px', marginLeft: '3rem' }}></div>
             )}
             <div style={{ flex: 1 }}></div>
             {currentDateIndex < dates.length - 1 && (
-              <button onClick={handleNextDay} className="nav-button-small">
+              <button onClick={handleNextDay} className="nav-button-small" style={{ flex: '0 0 auto', minWidth: '60px', padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}>
                 次の日
               </button>
             )}
           </div>
 
-          <div style={{ position: 'relative', display: 'inline-block', marginTop: '3rem' }}>
+          <div style={{ position: 'relative', display: 'inline-block', marginTop: '3rem', maxWidth: '100%' }}>
             <h2 
               onClick={() => setShowDateDropdown(!showDateDropdown)}
-              style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-block' }}
+              style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-block', fontSize: 'clamp(1rem, 4vw, 1.5rem)', margin: 0 }}
             >
               {selectedDate} のシフト入力 ▼
             </h2>
@@ -350,7 +351,7 @@ function ManagerCreate() {
             )}
           </div>
           
-          <div style={{ overflowX: 'auto', marginTop: '1rem', width: '100%', position: 'relative' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', marginTop: '1rem', width: '100%', position: 'relative', maxHeight: 'calc(100vh - 180px)', WebkitOverflowScrolling: 'touch' }}>
             <table className="shift-edit-table" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr>
@@ -503,8 +504,8 @@ function ManagerCreate() {
             </table>
           </div>
           
-          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-            <button onClick={handleSaveAndExit} className="save-button-small">
+          <div style={{ marginTop: '1rem', textAlign: 'center', paddingBottom: '1rem' }}>
+            <button onClick={handleSaveAndExit} className="save-button-small" style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem' }}>
               確定
             </button>
           </div>
@@ -514,10 +515,10 @@ function ManagerCreate() {
   }
 
   return (
-    <div className="fullscreen-table">
-      <div className="login-card">
-        <h2>シフト表</h2>
-        <div className="shift-table-wrapper">
+    <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
+      <div className="login-card" style={{ maxWidth: '100%', width: '100%', boxSizing: 'border-box', padding: '1rem' }}>
+        <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.5rem)' }}>シフト表</h2>
+        <div className="shift-table-wrapper" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 200px)', WebkitOverflowScrolling: 'touch' }}>
           <table className="shift-table">
             <thead>
               <tr>
@@ -539,8 +540,8 @@ function ManagerCreate() {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: '1rem' }}>
-          <button onClick={() => handleEditStart(0)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', width: 'auto' }}>
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <button onClick={() => handleEditStart(0)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', width: 'auto', minWidth: '100px' }}>
             作成
           </button>
         </div>

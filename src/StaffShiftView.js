@@ -39,7 +39,8 @@ function StaffShiftView({ onBack }) {
     try {
       const { data: users, error } = await supabase
         .from('users')
-        .select('*');
+        .select('*')
+        .eq('is_deleted', false);
 
       if (error) {
         console.error('ユーザー取得エラー:', error);
@@ -50,12 +51,16 @@ function StaffShiftView({ onBack }) {
       if (users && users.length > 0) {
         users.forEach(user => {
           const managerNumber = user.manager_number;
-          if (managerNumber !== null && managerNumber !== undefined) {
-            userMapTemp[String(managerNumber)] = user.name || `ユーザー${managerNumber}`;
-            userMapTemp[Number(managerNumber)] = user.name || `ユーザー${managerNumber}`;
+          if (managerNumber !== null && managerNumber !== undefined && user.name) {
+            // 文字列と数値の両方でマッピング
+            userMapTemp[String(managerNumber)] = user.name;
+            userMapTemp[Number(managerNumber)] = user.name;
+            // トリムした値でもマッピング（空白対策）
+            userMapTemp[String(managerNumber).trim()] = user.name;
           }
         });
       }
+      console.log('ユーザーマップ:', userMapTemp);
       setUserMap(userMapTemp);
     } catch (error) {
       console.error('予期しないエラー:', error);
@@ -91,12 +96,21 @@ function StaffShiftView({ onBack }) {
   const getUserName = (managerNumber) => {
     if (!managerNumber && managerNumber !== 0) return '管理番号なし';
     
-    const name = userMap[managerNumber] || 
-                 userMap[String(managerNumber)] || 
-                 userMap[Number(managerNumber)];
+    // 様々な形式で検索を試みる
+    const searchKeys = [
+      managerNumber,
+      String(managerNumber),
+      Number(managerNumber),
+      String(managerNumber).trim()
+    ];
     
-    if (name) return name;
+    for (const key of searchKeys) {
+      if (userMap[key]) {
+        return userMap[key];
+      }
+    }
     
+    console.log('名前が見つかりません。管理番号:', managerNumber, '型:', typeof managerNumber);
     return `管理番号: ${managerNumber}`;
   };
 
@@ -170,7 +184,6 @@ function StaffShiftView({ onBack }) {
     return days[date.getDay()];
   };
 
-  // 36時間表記対応：0:00～35:00まで1時間刻みで生成
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 0; hour < 36; hour++) {
@@ -192,12 +205,10 @@ function StaffShiftView({ onBack }) {
     let endMinutes = timeToMinutes(shift.end_time);
     const checkMinutes = timeToMinutes(timeStr);
 
-    // 翌日にまたがる場合の処理
     if (endMinutes < startMinutes) {
       endMinutes += 24 * 60;
     }
 
-    // チェック時刻も24時以降なら24*60を加算
     let adjustedCheckMinutes = checkMinutes;
     if (checkMinutes < startMinutes && endMinutes >= 24 * 60) {
       adjustedCheckMinutes += 24 * 60;
@@ -219,42 +230,52 @@ function StaffShiftView({ onBack }) {
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   const timeSlots = generateTimeSlots();
 
-  const sortedShiftData = [...shiftData].sort((a, b) => {
-    const aOff = isOffDay(a) ? 1 : 0;
-    const bOff = isOffDay(b) ? 1 : 0;
-    return aOff - bOff;
-  });
+  const sortedShiftData = [...shiftData]
+    .filter(shift => shift.manager_number !== null && shift.manager_number !== undefined)
+    .sort((a, b) => {
+      const aOff = isOffDay(a) ? 1 : 0;
+      const bOff = isOffDay(b) ? 1 : 0;
+      return aOff - bOff;
+    });
 
   if (currentView === 'calendar') {
     return (
-      <div className="login-wrapper">
-        <div className="login-card" style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h2>シフト確認</h2>
+      <div className="login-wrapper" style={{ padding: '0.5rem' }}>
+        <div className="login-card" style={{ 
+          width: '100%', 
+          maxWidth: '600px', 
+          maxHeight: '90vh', 
+          overflowY: 'auto',
+          padding: '1rem',
+          boxSizing: 'border-box'
+        }}>
+          <h2 style={{ fontSize: 'clamp(18px, 4vw, 24px)', marginBottom: '1rem' }}>シフト確認</h2>
 
           <div style={{
             marginTop: '1rem',
             border: '1px solid #ddd',
             borderRadius: '8px',
-            padding: '1rem',
+            padding: '0.75rem',
             backgroundColor: '#f9f9f9'
           }}>
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '1rem'
+              marginBottom: '0.75rem'
             }}>
               <button onClick={() => changeMonth(-1)} style={{
                 backgroundColor: '#607D8B',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                padding: '0.5rem',
-                cursor: 'pointer'
+                padding: '0.5rem 0.75rem',
+                cursor: 'pointer',
+                fontSize: 'clamp(14px, 3vw, 16px)'
               }}>
                 ◀
               </button>
-              <h3 style={{ margin: 0 }}>
+              <h3 style={{ margin: 0, fontSize: 'clamp(16px, 3.5vw, 20px)' }}>
                 {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
               </h3>
               <button onClick={() => changeMonth(1)} style={{
@@ -262,8 +283,9 @@ function StaffShiftView({ onBack }) {
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                padding: '0.5rem',
-                cursor: 'pointer'
+                padding: '0.5rem 0.75rem',
+                cursor: 'pointer',
+                fontSize: 'clamp(14px, 3vw, 16px)'
               }}>
                 ▶
               </button>
@@ -279,8 +301,9 @@ function StaffShiftView({ onBack }) {
                 <div key={day} style={{
                   textAlign: 'center',
                   fontWeight: 'bold',
-                  padding: '0.5rem',
-                  backgroundColor: '#e0e0e0'
+                  padding: '0.4rem',
+                  backgroundColor: '#e0e0e0',
+                  fontSize: 'clamp(11px, 2.5vw, 14px)'
                 }}>
                   {day}
                 </div>
@@ -308,19 +331,12 @@ function StaffShiftView({ onBack }) {
                            dayInfo.isCurrentMonth ? 'black' : '#666',
                     fontWeight: dayInfo.hasShift ? 'bold' : 'normal',
                     opacity: dayInfo.isCurrentMonth ? 1 : 0.5,
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (dayInfo.hasShift) {
-                      e.target.style.backgroundColor = '#BBDEFB';
-                      e.target.style.transform = 'scale(1.05)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (dayInfo.hasShift) {
-                      e.target.style.backgroundColor = '#E3F2FD';
-                      e.target.style.transform = 'scale(1)';
-                    }
+                    transition: 'all 0.3s ease',
+                    fontSize: 'clamp(12px, 3vw, 14px)',
+                    minHeight: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                 >
                   {dayInfo.day}
@@ -330,7 +346,7 @@ function StaffShiftView({ onBack }) {
 
             <div style={{
               marginTop: '0.5rem',
-              fontSize: '0.8rem',
+              fontSize: 'clamp(10px, 2vw, 12px)',
               color: '#666',
               textAlign: 'center'
             }}>
@@ -338,7 +354,7 @@ function StaffShiftView({ onBack }) {
             </div>
           </div>
 
-          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
             <button onClick={onBack} style={{
               backgroundColor: '#607D8B',
               color: 'white',
@@ -346,7 +362,9 @@ function StaffShiftView({ onBack }) {
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '1rem'
+              fontSize: 'clamp(14px, 3vw, 16px)',
+              width: '100%',
+              maxWidth: '300px'
             }}>
               メニューに戻る
             </button>
@@ -357,15 +375,56 @@ function StaffShiftView({ onBack }) {
   }
 
   return (
-    <div className="login-wrapper">
-      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-          <button onClick={() => changeDate(-1)}>◀</button>
-          {selectedDate} ({getWeekday(selectedDate)}) のシフト
-          <button onClick={() => changeDate(1)}>▶</button>
-        </h2>
+    <div className="login-wrapper" style={{ padding: '0.5rem' }}>
+      <div className="login-card" style={{ 
+        width: '100%', 
+        maxWidth: '900px', 
+        maxHeight: '90vh', 
+        overflowY: 'auto',
+        padding: '1rem',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: '0.5rem',
+          marginBottom: '1rem'
+        }}>
+          <button 
+            onClick={() => changeDate(-1)}
+            style={{
+              padding: '0.4rem 0.6rem',
+              fontSize: 'clamp(14px, 3vw, 16px)',
+              backgroundColor: '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ◀
+          </button>
+          <span style={{ fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 'bold' }}>
+            {selectedDate} ({getWeekday(selectedDate)})
+          </span>
+          <button 
+            onClick={() => changeDate(1)}
+            style={{
+              padding: '0.4rem 0.6rem',
+              fontSize: 'clamp(14px, 3vw, 16px)',
+              backgroundColor: '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            ▶
+          </button>
+        </div>
 
-        <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+        <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => setViewMode('list')}
             style={{
@@ -375,7 +434,10 @@ function StaffShiftView({ onBack }) {
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(12px, 2.5vw, 14px)',
+              flex: '1',
+              minWidth: '120px'
             }}
           >
             リスト表示
@@ -389,7 +451,10 @@ function StaffShiftView({ onBack }) {
               border: 'none',
               borderRadius: '4px',
               cursor: 'pointer',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(12px, 2.5vw, 14px)',
+              flex: '1',
+              minWidth: '120px'
             }}
           >
             タイムライン表示
@@ -397,7 +462,7 @@ function StaffShiftView({ onBack }) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <div style={{ textAlign: 'center', padding: '2rem', fontSize: 'clamp(14px, 3vw, 16px)' }}>
             読み込み中...
           </div>
         ) : sortedShiftData.length === 0 ? (
@@ -406,7 +471,8 @@ function StaffShiftView({ onBack }) {
             padding: '2rem',
             color: '#666',
             backgroundColor: '#f9f9f9',
-            borderRadius: '8px'
+            borderRadius: '8px',
+            fontSize: 'clamp(14px, 3vw, 16px)'
           }}>
             この日のシフトはありません
           </div>
@@ -416,106 +482,138 @@ function StaffShiftView({ onBack }) {
             borderRadius: '8px',
             overflow: 'hidden'
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f5f5f5' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-                    名前
-                  </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                    店舗
-                  </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                    勤務時間
-                  </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd' }}>
-                    状態
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedShiftData.map((shift, index) => (
-                  <tr key={shift.manager_number || index} style={{
-                    backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9'
-                  }}>
-                    <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>
-                      <strong>{getUserName(shift.manager_number)}</strong>
-                    </td>
-                    <td style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      borderBottom: '1px solid #eee',
-                      fontWeight: 'bold',
-                      color: '#1976D2'
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f5f5f5' }}>
+                    <th style={{ 
+                      padding: '0.75rem 0.5rem', 
+                      textAlign: 'left', 
+                      borderBottom: '1px solid #ddd',
+                      fontSize: 'clamp(12px, 2.5vw, 14px)'
                     }}>
-                      {shift.store ? `${shift.store}店舗` : '-'}
-                    </td>
-                    <td style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      borderBottom: '1px solid #eee'
+                      名前
+                    </th>
+                    <th style={{ 
+                      padding: '0.75rem 0.5rem', 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #ddd',
+                      fontSize: 'clamp(12px, 2.5vw, 14px)'
                     }}>
-                      {isOffDay(shift) ? (
-                        <span style={{ color: '#999', fontStyle: 'italic' }}>休み</span>
-                      ) : (
-                        <span style={{ fontWeight: 'bold' }}>
-                          {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{
-                      padding: '0.75rem',
-                      textAlign: 'center',
-                      borderBottom: '1px solid #eee'
+                      店舗
+                    </th>
+                    <th style={{ 
+                      padding: '0.75rem 0.5rem', 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #ddd',
+                      fontSize: 'clamp(12px, 2.5vw, 14px)'
                     }}>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        backgroundColor: isOffDay(shift) ? '#f44336' : '#4CAF50',
-                        color: 'white'
-                      }}>
-                        {isOffDay(shift) ? '休み' : '出勤'}
-                      </span>
-                    </td>
+                      勤務時間
+                    </th>
+                    <th style={{ 
+                      padding: '0.75rem 0.5rem', 
+                      textAlign: 'center', 
+                      borderBottom: '1px solid #ddd',
+                      fontSize: 'clamp(12px, 2.5vw, 14px)'
+                    }}>
+                      状態
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedShiftData.map((shift, index) => (
+                    <tr key={shift.manager_number || index} style={{
+                      backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9'
+                    }}>
+                      <td style={{ 
+                        padding: '0.75rem 0.5rem', 
+                        borderBottom: '1px solid #eee',
+                        fontSize: 'clamp(12px, 2.5vw, 14px)'
+                      }}>
+                        <strong>{getUserName(shift.manager_number)}</strong>
+                      </td>
+                      <td style={{
+                        padding: '0.75rem 0.5rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee',
+                        fontWeight: 'bold',
+                        color: '#1976D2',
+                        fontSize: 'clamp(12px, 2.5vw, 14px)'
+                      }}>
+                        {shift.store ? `${shift.store}店舗` : '-'}
+                      </td>
+                      <td style={{
+                        padding: '0.75rem 0.5rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee',
+                        fontSize: 'clamp(11px, 2.5vw, 13px)'
+                      }}>
+                        {isOffDay(shift) ? (
+                          <span style={{ color: '#999', fontStyle: 'italic' }}>休み</span>
+                        ) : (
+                          <span style={{ fontWeight: 'bold' }}>
+                            {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{
+                        padding: '0.75rem 0.5rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee'
+                      }}>
+                        <span style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '12px',
+                          fontSize: 'clamp(10px, 2vw, 12px)',
+                          backgroundColor: isOffDay(shift) ? '#f44336' : '#4CAF50',
+                          color: 'white',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {isOffDay(shift) ? '休み' : '出勤'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div style={{
             border: '1px solid #ddd',
             borderRadius: '8px',
             overflow: 'auto',
-            maxHeight: '500px'
+            maxHeight: '500px',
+            WebkitOverflowScrolling: 'touch'
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '2000px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1500px' }}>
               <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5', zIndex: 2 }}>
                 <tr>
                   <th style={{
-                    padding: '0.5rem',
+                    padding: '0.4rem',
                     textAlign: 'left',
                     borderBottom: '2px solid #999',
                     borderRight: '2px solid #999',
-                    minWidth: '160px',
+                    minWidth: '100px',
                     backgroundColor: '#f5f5f5',
                     position: 'sticky',
                     left: 0,
-                    zIndex: 3
+                    zIndex: 3,
+                    fontSize: 'clamp(11px, 2vw, 13px)'
                   }}>
                     名前
                   </th>
                   <th style={{
-                    padding: '0.5rem',
+                    padding: '0.4rem',
                     textAlign: 'center',
                     borderBottom: '2px solid #999',
                     borderRight: '2px solid #999',
-                    minWidth: '80px',
+                    minWidth: '60px',
                     backgroundColor: '#f5f5f5',
                     position: 'sticky',
-                    left: '160px',
-                    zIndex: 3
+                    left: '100px',
+                    zIndex: 3,
+                    fontSize: 'clamp(10px, 2vw, 12px)'
                   }}>
                     店舗
                   </th>
@@ -525,8 +623,8 @@ function StaffShiftView({ onBack }) {
                       textAlign: 'center',
                       borderBottom: '2px solid #999',
                       borderRight: '1px solid #ccc',
-                      minWidth: '50px',
-                      fontSize: '0.75rem',
+                      minWidth: '35px',
+                      fontSize: 'clamp(9px, 1.8vw, 11px)',
                       fontWeight: 'bold',
                       backgroundColor: '#f5f5f5'
                     }}>
@@ -539,28 +637,30 @@ function StaffShiftView({ onBack }) {
                 {sortedShiftData.map((shift, index) => (
                   <tr key={shift.manager_number || index} style={{ backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9' }}>
                     <td style={{ 
-                      padding: '0.5rem', 
+                      padding: '0.4rem', 
                       fontWeight: 'bold', 
                       borderBottom: '1px solid #ddd',
                       borderRight: '2px solid #999',
                       position: 'sticky',
                       left: 0,
                       backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9',
-                      zIndex: 1
+                      zIndex: 1,
+                      fontSize: 'clamp(11px, 2vw, 13px)'
                     }}>
                       {getUserName(shift.manager_number)}
                     </td>
                     <td style={{
-                      padding: '0.5rem',
+                      padding: '0.4rem',
                       textAlign: 'center',
                       borderBottom: '1px solid #ddd',
                       borderRight: '2px solid #999',
                       fontWeight: 'bold',
                       color: '#1976D2',
                       position: 'sticky',
-                      left: '160px',
+                      left: '100px',
                       backgroundColor: index % 2 === 0 ? 'white' : '#f9f9f9',
-                      zIndex: 1
+                      zIndex: 1,
+                      fontSize: 'clamp(10px, 2vw, 12px)'
                     }}>
                       {shift.store || '-'}
                     </td>
@@ -573,8 +673,8 @@ function StaffShiftView({ onBack }) {
                           textAlign: 'center',
                           backgroundColor: isWorking ? '#4CAF50' : (index % 2 === 0 ? 'white' : '#f9f9f9'),
                           transition: 'all 0.3s ease',
-                          padding: '0.25rem',
-                          fontSize: '0.7rem'
+                          padding: '0.2rem',
+                          fontSize: 'clamp(8px, 1.5vw, 10px)'
                         }}>
                           {isWorking ? '●' : ''}
                         </td>
@@ -594,7 +694,10 @@ function StaffShiftView({ onBack }) {
             padding: '0.75rem 2rem',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            fontSize: 'clamp(14px, 3vw, 16px)',
+            width: '100%',
+            maxWidth: '300px'
           }}>
             カレンダーに戻る
           </button>

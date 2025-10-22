@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
-import { AuthError } from '@supabase/supabase-js';
 
 function RegisterUser({ onBack }) {
   const [name, setName] = useState('');
@@ -33,7 +32,7 @@ function RegisterUser({ onBack }) {
 
     const { error } = await supabase
       .from('users')
-      .insert([{ name, manager_number: number }]);
+      .insert([{ name, manager_number: number, is_deleted: false }]);
 
     if (error) {
       console.error(error);
@@ -48,7 +47,8 @@ function RegisterUser({ onBack }) {
   const fetchUsers = async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('*');
+      .select('*')
+      .eq('is_deleted', false);
 
     if (error) {
       console.error(error);
@@ -60,8 +60,17 @@ function RegisterUser({ onBack }) {
   };
 
   const handleDelete = async (id) => {
-    await supabase.from('users').delete().eq('id', id);
-    fetchUsers();
+    const { error } = await supabase
+      .from('users')
+      .update({ is_deleted: true })
+      .eq('id', id);
+
+    if (error) {
+      console.error(error);
+      setMessage('削除に失敗しました');
+    } else {
+      fetchUsers();
+    }
   };
 
   return (
@@ -107,28 +116,27 @@ function RegisterUser({ onBack }) {
             }}>
               <h4 style={{ margin:'auto' }}>登録一覧</h4>
               <button
-  onClick={fetchUsers}
-  style={{
-    fontSize: '0.75rem',
-    padding: '0.2rem 0.4rem',  // 横パディングを少し狭く
-    cursor: 'pointer',
-    height: '24px',
-    minWidth: 'auto',          // 幅を自動調整
-    width: 'auto',
-    whiteSpace: 'nowrap',      // テキストを1行に固定
-  }}
-  title="一覧を更新"
->
-  更新
-</button>
-
+                onClick={fetchUsers}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.2rem 0.4rem',
+                  cursor: 'pointer',
+                  height: '24px',
+                  minWidth: 'auto',
+                  width: 'auto',
+                  whiteSpace: 'nowrap',
+                }}
+                title="一覧を更新"
+              >
+                更新
+              </button>
             </div>
 
             <table style={{
               width: '100%',
               borderCollapse: 'collapse',
               textAlign: 'left',
-              marginTop: '6.0rem'
+              marginTop: '1rem'
             }}>
               <thead>
                 <tr>
