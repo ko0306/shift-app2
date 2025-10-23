@@ -355,12 +355,12 @@ function ManagerCreate() {
             <table className="shift-edit-table" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr>
-                  <th style={{ minWidth: '50px', width: '50px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>名前</th>
-                  <th style={{ minWidth: '45px', width: '45px', position: 'sticky', left: '50px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>店舗</th>
-                  <th style={{ minWidth: '100px', width: '100px', position: 'sticky', left: '95px', zIndex: 3, backgroundColor: '#FFDAB9', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>備考</th>
-                  <th style={{ minWidth: '35px', width: '35px', position: 'sticky', left: '195px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>休</th>
-                  <th style={{ minWidth: '120px', width: '120px', position: 'sticky', left: '230px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>開始</th>
-                  <th style={{ minWidth: '120px', width: '120px', position: 'sticky', left: '350px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', color: 'black', fontSize: '0.8rem', padding: '0.2rem' }}>終了</th>
+                  <th style={{ minWidth: '35px', width: '35px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>名前</th>
+                  <th style={{ minWidth: '30px', width: '30px', position: 'sticky', left: '35px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>店舗</th>
+                  <th style={{ minWidth: '60px', width: '60px', position: 'sticky', left: '65px', zIndex: 3, backgroundColor: '#FFDAB9', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>備考</th>
+                  <th style={{ minWidth: '25px', width: '25px', position: 'sticky', left: '125px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>休</th>
+                  <th style={{ minWidth: '85px', width: '85px', position: 'sticky', left: '150px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>開始</th>
+                  <th style={{ minWidth: '85px', width: '85px', position: 'sticky', left: '235px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>終了</th>
                   {timeSlots.map((t, i) => (
                     <th key={i} style={{ minWidth: '28px', width: '28px', backgroundColor: '#F0E68C', border: '1px solid #ddd', color: 'black', fontSize: '0.7rem', padding: '0.1rem' }}>{t}</th>
                   ))}
@@ -379,8 +379,8 @@ function ManagerCreate() {
 
                   return (
                     <tr key={rowIndex} className={row.isOff ? 'off-row' : ''}>
-                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', minWidth: '50px', width: '50px', padding: '0.2rem', border: '1px solid #ddd', fontSize: '0.8rem' }}>{row.name}</td>
-                      <td style={{ position: 'sticky', left: '50px', zIndex: 2, backgroundColor: 'white', minWidth: '45px', width: '45px', padding: '0.2rem', border: '1px solid #ddd' }}>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', minWidth: '35px', width: '35px', padding: '0.1rem', border: '1px solid #ddd', fontSize: '0.65rem' }}>{row.name}</td>
+                      <td style={{ position: 'sticky', left: '35px', zIndex: 2, backgroundColor: 'white', minWidth: '30px', width: '30px', padding: '0.1rem', border: '1px solid #ddd' }}>
                         {row.isEditingStore ? (
                           <input
                             type="text"
@@ -390,58 +390,58 @@ function ManagerCreate() {
                             autoFocus
                             placeholder="店舗"
                             style={{
-                              padding: '0.1rem',
+                              padding: '0.05rem',
                               border: '1px solid #2196F3',
                               borderRadius: '2px',
                               width: '100%',
                               boxSizing: 'border-box',
-                              fontSize: '0.8rem'
+                              fontSize: '0.65rem'
                             }}
                           />
                         ) : (
                           <div
                             onClick={() => toggleStoreEdit(rowIndex)}
                             style={{
-                              padding: '0.1rem',
+                              padding: '0.05rem',
                               cursor: 'pointer',
                               backgroundColor: 'white',
                               textAlign: 'center',
-                              fontSize: '0.8rem',
-                              minHeight: '18px'
+                              fontSize: '0.65rem',
+                              minHeight: '16px'
                             }}
                           >
                             {row.store || 'A'}
                           </div>
                         )}
                       </td>
-                      <td style={{ position: 'sticky', left: '95px', zIndex: 2, backgroundColor: 'white', minWidth: '100px', width: '100px', padding: '0.2rem', fontSize: '0.75rem', color: '#666', border: '1px solid #ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <td style={{ position: 'sticky', left: '65px', zIndex: 2, backgroundColor: 'white', minWidth: '60px', width: '60px', padding: '0.1rem', fontSize: '0.6rem', color: '#666', border: '1px solid #ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {row.remarks || ''}
                       </td>
-                      <td style={{ position: 'sticky', left: '195px', zIndex: 2, backgroundColor: 'white', minWidth: '35px', width: '35px', padding: '0.2rem', border: '1px solid #ddd', textAlign: 'center' }}>
+                      <td style={{ position: 'sticky', left: '125px', zIndex: 2, backgroundColor: 'white', minWidth: '25px', width: '25px', padding: '0.1rem', border: '1px solid #ddd', textAlign: 'center' }}>
                         <input 
                           type="checkbox" 
                           checked={row.isOff}
                           onChange={e => handleCheckboxChange(rowIndex, e.target.checked)}
                         />
                       </td>
-                      <td style={{ position: 'sticky', left: '230px', zIndex: 2, backgroundColor: 'white', minWidth: '120px', width: '120px', padding: '0.15rem', border: '1px solid #ddd' }}>
-                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                      <td style={{ position: 'sticky', left: '150px', zIndex: 2, backgroundColor: 'white', minWidth: '85px', width: '85px', padding: '0.1rem', border: '1px solid #ddd' }}>
+                        <div style={{ display: 'flex', gap: '1px', alignItems: 'center' }}>
                           <select
                             value={row.startHour}
                             onChange={e => handleTimeChange(rowIndex, 'startHour', e.target.value)}
                             disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.7rem', padding: '0.1rem' }}
+                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
                           >
                             {[...Array(37)].map((_, h) => (
                               <option key={h} value={h}>{h}</option>
                             ))}
                           </select>
-                          <span style={{ fontSize: '0.7rem' }}>:</span>
+                          <span style={{ fontSize: '0.65rem' }}>:</span>
                           <select
                             value={row.startMin}
                             onChange={e => handleTimeChange(rowIndex, 'startMin', e.target.value)}
                             disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.7rem', padding: '0.1rem' }}
+                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
                           >
                             {[...Array(60)].map((_, m) => (
                               <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -449,24 +449,24 @@ function ManagerCreate() {
                           </select>
                         </div>
                       </td>
-                      <td style={{ position: 'sticky', left: '350px', zIndex: 2, backgroundColor: 'white', minWidth: '120px', width: '120px', padding: '0.15rem', border: '1px solid #ddd' }}>
-                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                      <td style={{ position: 'sticky', left: '235px', zIndex: 2, backgroundColor: 'white', minWidth: '85px', width: '85px', padding: '0.1rem', border: '1px solid #ddd' }}>
+                        <div style={{ display: 'flex', gap: '1px', alignItems: 'center' }}>
                           <select
                             value={row.endHour}
                             onChange={e => handleTimeChange(rowIndex, 'endHour', e.target.value)}
                             disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.7rem', padding: '0.1rem' }}
+                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
                           >
                             {[...Array(37)].map((_, h) => (
                               <option key={h} value={h}>{h}</option>
                             ))}
                           </select>
-                          <span style={{ fontSize: '0.7rem' }}>:</span>
+                          <span style={{ fontSize: '0.65rem' }}>:</span>
                           <select
                             value={row.endMin}
                             onChange={e => handleTimeChange(rowIndex, 'endMin', e.target.value)}
                             disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.7rem', padding: '0.1rem' }}
+                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
                           >
                             {[...Array(60)].map((_, m) => (
                               <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
