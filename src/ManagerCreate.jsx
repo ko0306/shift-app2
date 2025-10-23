@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
 function ManagerCreate() {
@@ -13,6 +13,24 @@ function ManagerCreate() {
   const [editRows, setEditRows] = useState([]);
   const [currentDateIndex, setCurrentDateIndex] = useState(0);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      const portrait = window.innerHeight > window.innerWidth;
+      console.log('Orientation check:', { width: window.innerWidth, height: window.innerHeight, portrait });
+      setIsPortrait(portrait);
+    };
+
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, []);
 
   const parseTime = (timeStr) => {
     if (!timeStr) return { hour: '', min: '' };
@@ -293,6 +311,36 @@ function ManagerCreate() {
   if (isEditing) {
     return (
       <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+        {isPortrait && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: 'white',
+            padding: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '4rem', marginBottom: '2rem', animation: 'rotate 2s ease-in-out infinite' }}>
+              📱→📱
+            </div>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>画面を横向きにしてください</h2>
+            <p style={{ fontSize: '1rem', color: '#ccc' }}>シフト編集画面は横向きでの使用を推奨します</p>
+            <style>{`
+              @keyframes rotate {
+                0%, 100% { transform: rotate(0deg); }
+                50% { transform: rotate(90deg); }
+              }
+            `}</style>
+          </div>
+        )}
         <div className="login-card" style={{ position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box', padding: '1rem' }}>
           <div style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', right: '0.5rem', display: 'flex', justifyContent: 'space-between', zIndex: 10, gap: '0.5rem' }}>
             {currentDateIndex > 0 ? (
