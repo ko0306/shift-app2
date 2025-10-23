@@ -308,7 +308,7 @@ function App() {
                 isLoggedIn: true
               });
               setRole('clockin');
-            }} style={{ backgroundColor: '#00BCD4' }}>退勤入力</button>
+            }} style={{ backgroundColor: '#00BCD4' }}>勤怠入力</button>
           </div>
         </div>
       </div>
@@ -388,7 +388,7 @@ function App() {
                 isLoggedIn: true
               });
               setManagerStep('attendance');
-            }} style={{ backgroundColor: '#0D47A1' }}>退勤管理</button>
+            }} style={{ backgroundColor: '#0D47A1' }}>勤怠管理</button>
             <button onClick={() => {
               pushToHistory({
                 role: role,
@@ -863,8 +863,8 @@ function App() {
                 managerStep: managerStep,
                 isLoggedIn: true
               });
-              setCurrentStep('shiftView');
-            }} style={{ backgroundColor: '#1976D2' }}>シフト確認</button>
+              setCurrentStep('shiftEdit');
+            }} style={{ backgroundColor: '#1976D2' }}>シフト変更</button>
             <button onClick={() => {
               pushToHistory({
                 role: role,
@@ -873,8 +873,8 @@ function App() {
                 managerStep: managerStep,
                 isLoggedIn: true
               });
-              setCurrentStep('shiftEdit');
-            }} style={{ backgroundColor: '#1565C0' }}>シフト変更</button>
+              setCurrentStep('shiftView');
+            }} style={{ backgroundColor: '#1565C0' }}>シフト確認</button>
             <button onClick={() => {
               pushToHistory({
                 role: role,
