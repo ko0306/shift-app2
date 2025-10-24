@@ -280,7 +280,7 @@ function App() {
     return (
       <div className="login-wrapper">
         <form className="login-card" onSubmit={handleLogin}>
-          <h2>ログイ</h2>
+          <h2>ログイン</h2>
           <input type="text" placeholder="ログインID" value={id} onChange={e => setId(e.target.value)} required />
           <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} required />
           <button type="submit" style={{ backgroundColor: '#2196F3' }}>ログイン</button>
