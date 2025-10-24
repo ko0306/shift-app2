@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
-function ManagerCreate() {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [shiftData, setShiftData] = useState([]);
-  const [userMap, setUserMap] = useState({});
-  const [dates, setDates] = useState([]);
-  const [showTable, setShowTable] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+// 日付文字列を正確に取得する関数（タイムゾーン対応）
+const getDateString = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+function ManagerShiftView({ onBack }) {
   const [selectedDate, setSelectedDate] = useState('');
-  const [editRows, setEditRows] = useState([]);
-  const [currentDateIndex, setCurrentDateIndex] = useState(0);
-  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [shiftData, setShiftData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [userMap, setUserMap] = useState({});
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [availableDates, setAvailableDates] = useState([]);
+  const [viewMode, setViewMode] = useState('list');
+  const [currentView, setCurrentView] = useState('calendar');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingShifts, setEditingShifts] = useState([]);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+
+  useEffect(() => {
+    fetchUsers();
+    fetchAvailableDates();
+  }, []);
 
   useEffect(() => {
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
-      console.log('Orientation check:', { width: window.innerWidth, height: window.innerHeight, portrait });
       setIsPortrait(portrait);
     };
 
@@ -32,103 +44,140 @@ function ManagerCreate() {
     };
   }, []);
 
-  const parseTime = (timeStr) => {
-    if (!timeStr) return { hour: '', min: '' };
-    const parts = timeStr.split(':');
-    return { 
-      hour: parts[0] ? parseInt(parts[0], 10).toString() : '', 
-      min: parts[1] ? parseInt(parts[1], 10).toString() : '' 
-    };
-  };
-
-  const fetchShiftData = async () => {
-    if (!startDate || !endDate || startDate > endDate) {
-      alert('正しい開始日と終了日を入力してください');
-      return;
-    }
-
+  const fetchAvailableDates = async () => {
     try {
-      const oneAndHalfYearsAgo = new Date(startDate);
-      oneAndHalfYearsAgo.setMonth(oneAndHalfYearsAgo.getMonth() - 18);
-      const oneAndHalfYearsAgoStr = oneAndHalfYearsAgo.toISOString().split('T')[0];
-
-      const { error: deleteShiftsError } = await supabase
-        .from('shifts')
-        .delete()
-        .lt('date', oneAndHalfYearsAgoStr);
-
-      if (deleteShiftsError) {
-        console.error('古いshiftsデータ削除エラー:', deleteShiftsError);
-      }
-
-      const { error: deleteFinalShiftsError } = await supabase
+      const { data: finalShifts, error } = await supabase
         .from('final_shifts')
-        .delete()
-        .lt('date', oneAndHalfYearsAgoStr);
+        .select('date')
+        .order('date');
 
-      if (deleteFinalShiftsError) {
-        console.error('古いfinal_shiftsデータ削除エラー:', deleteFinalShiftsError);
-      }
-
-      const { data: shifts, error: shiftError } = await supabase
-        .from('shifts')
-        .select('*')
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('created_at', { ascending: false });
-
-      const { data: users, error: userError } = await supabase
-        .from('users')
-        .select('*');
-
-      if (shiftError || userError) {
-        console.error(shiftError || userError);
-        alert('データ取得に失敗しました');
+      if (error) {
+        console.error('日付取得エラー:', error);
         return;
       }
 
-      const userManagerNumbers = new Set(users.map(user => String(user.manager_number)));
-      const userMapTemp = {};
-      users.forEach(user => {
-        userMapTemp[String(user.manager_number)] = user.name;
-      });
-
-      const latestShiftsMap = {};
-      shifts.forEach(shift => {
-        const key = `${shift.date}_${shift.manager_number}`;
-        if (!latestShiftsMap[key]) {
-          latestShiftsMap[key] = shift;
-        }
-      });
-
-      const filteredShifts = Object.values(latestShiftsMap).filter(shift => 
-        userManagerNumbers.has(String(shift.manager_number))
-      );
-
-      const allDates = [];
-      const d = new Date(startDate);
-      while (d <= new Date(endDate)) {
-        allDates.push(d.toISOString().split('T')[0]);
-        d.setDate(d.getDate() + 1);
-      }
-
-      setDates(allDates);
-      setUserMap(userMapTemp);
-      setShiftData(filteredShifts);
-      setShowTable(true);
-
+      const uniqueDates = finalShifts ? [...new Set(finalShifts.map(item => item.date))].sort() : [];
+      setAvailableDates(uniqueDates);
     } catch (error) {
-      console.error('データ処理エラー:', error);
-      alert('データ処理中にエラーが発生しました');
+      console.error('日付取得エラー:', error);
     }
   };
 
-  const groupedByUser = {};
-  shiftData.forEach(shift => {
-    const name = userMap[String(shift.manager_number)] || '(不明)';
-    if (!groupedByUser[name]) groupedByUser[name] = {};
-    groupedByUser[name][shift.date] = `${shift.start_time || ''} ~ ${shift.end_time || ''}`;
-  });
+  const fetchUsers = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*');
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const userMapTemp = {};
+    if (data) {
+      data.forEach(user => {
+        userMapTemp[user.manager_number] = user.name;
+        userMapTemp[String(user.manager_number)] = user.name;
+        userMapTemp[Number(user.manager_number)] = user.name;
+      });
+    }
+    setUserMap(userMapTemp);
+  };
+
+  const fetchShiftData = async (date) => {
+    if (!date) return;
+
+    setLoading(true);
+    
+    const { data: finalShifts, error: finalError } = await supabase
+      .from('final_shifts')
+      .select('*')
+      .eq('date', date)
+      .order('manager_number');
+
+    if (finalError) {
+      alert('データ取得に失敗しました');
+      setShiftData([]);
+    } else {
+      setShiftData(finalShifts || []);
+    }
+
+    setCurrentView('shift');
+    setLoading(false);
+  };
+
+  const getUserName = (managerNumber) => {
+    return userMap[managerNumber] || '(不明)';
+  };
+
+  const handleDateSelect = (date) => {
+    if (!availableDates.includes(date)) return;
+    setSelectedDate(date);
+    fetchShiftData(date);
+  };
+
+  const handleBackToCalendar = () => {
+    setCurrentView('calendar');
+    setSelectedDate('');
+    setShiftData([]);
+    setIsEditing(false);
+    setShowTimeline(false);
+  };
+
+  const changeDate = (delta) => {
+    if (!selectedDate || availableDates.length === 0) return;
+    const idx = availableDates.indexOf(selectedDate);
+    const newIdx = idx + delta;
+    if (newIdx >= 0 && newIdx < availableDates.length) {
+      const newDate = availableDates[newIdx];
+      setSelectedDate(newDate);
+      fetchShiftData(newDate);
+      setIsEditing(false);
+      setEditingShifts([]);
+      setShowTimeline(false);
+    }
+  };
+
+  const parseTime36 = (timeStr) => {
+    if (!timeStr) return { hour: 9, min: 0 };
+    const parts = timeStr.split(':');
+    const hour = parseInt(parts[0], 10);
+    const min = parseInt(parts[1], 10);
+    return { hour, min };
+  };
+
+  const formatTime36 = (hour, min) => {
+    return `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  };
+
+  const handleEditToggle = () => {
+    if (!isEditing) {
+      console.log('編集モード開始 - 元データ:', shiftData);
+      
+      setEditingShifts(shiftData.map(shift => {
+        const startTime = parseTime36(shift.start_time);
+        const endTime = parseTime36(shift.end_time);
+        
+        return {
+          ...shift,
+          startHour: startTime.hour,
+          startMin: startTime.min,
+          endHour: endTime.hour,
+          endMin: endTime.min,
+          store: shift.store || '',
+          is_off: shift.is_off || isOffDay(shift)
+        };
+      }));
+      setShowTimeline(false);
+    } else {
+      setShowTimeline(false);
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const toggleTimeline = () => {
+    setShowTimeline(!showTimeline);
+  };
 
   const generateTimeSlots = () => {
     const slots = [];
@@ -142,99 +191,61 @@ function ManagerCreate() {
     return slots;
   };
 
-  const handleEditStart = (dateIndex = 0) => {
-    const date = dates[dateIndex];
-    setSelectedDate(date);
-    setCurrentDateIndex(dateIndex);
-    const rows = shiftData
-      .filter(shift => shift.date === date && !(shift.start_time === '00:00:00' && shift.end_time === '00:00:00'))
-      .map(shift => {
-        const startTime = parseTime(shift.start_time);
-        const endTime = parseTime(shift.end_time);
-        return {
-          id: shift.id,
-          name: userMap[shift.manager_number],
-          manager_number: shift.manager_number,
-          startHour: '0',
-          startMin: '0',
-          endHour: '0',
-          endMin: '0',
-          originalStart: shift.start_time,
-          originalEnd: shift.end_time,
-          originalStartHour: startTime.hour,
-          originalStartMin: startTime.min,
-          originalEndHour: endTime.hour,
-          originalEndMin: endTime.min,
-          isOff: false,
-          store: 'A',
-          isEditingStore: false,
-          remarks: shift.remarks || ''
-        };
-      });
-    setEditRows(rows);
-    setIsEditing(true);
+  const handleShiftChange = (shiftId, field, value) => {
+    const updated = editingShifts.map(shift => {
+      if (shift.id === shiftId || 
+          (shift.manager_number === shiftId && !shift.id)) {
+        const updatedShift = { ...shift, [field]: value };
+        
+        if (field === 'is_off') {
+          if (value) {
+            updatedShift.startHour = 0;
+            updatedShift.startMin = 0;
+            updatedShift.endHour = 0;
+            updatedShift.endMin = 0;
+          } else {
+            updatedShift.startHour = updatedShift.startHour || 9;
+            updatedShift.startMin = updatedShift.startMin || 0;
+            updatedShift.endHour = updatedShift.endHour || 17;
+            updatedShift.endMin = updatedShift.endMin || 0;
+          }
+        }
+        
+        return updatedShift;
+      }
+      return shift;
+    });
+    
+    setEditingShifts(updated);
   };
 
-  const handleDateSelect = (dateIndex) => {
-    setCurrentDateIndex(dateIndex);
-    handleEditStart(dateIndex);
-    setShowDateDropdown(false);
-  };
-
-  const handleCheckboxChange = (index, checked) => {
-    const updated = [...editRows];
-    updated[index].isOff = checked;
-    if (checked) {
-      updated[index].startHour = '0';
-      updated[index].startMin = '0';
-      updated[index].endHour = '0';
-      updated[index].endMin = '0';
-    }
-    setEditRows(updated);
-  };
-
-  const handleTimeChange = (index, field, value) => {
-    const updated = [...editRows];
-    updated[index][field] = value;
-    setEditRows(updated);
-  };
-
-  const toggleStoreEdit = (index) => {
-    const updated = [...editRows];
-    updated[index].isEditingStore = !updated[index].isEditingStore;
-    setEditRows(updated);
-  };
-
-  const handleStoreInputChange = (index, value) => {
-    const updated = [...editRows];
-    updated[index].store = value;
-    setEditRows(updated);
-  };
-
-  const handleSave = async () => {
+  const handleUpdate = async () => {
     try {
-      for (const row of editRows) {
-        const storeValue = row.store;
+      setLoading(true);
+      
+      for (const shift of editingShifts) {
+        const storeValue = shift.store;
         
         if (!storeValue || storeValue.trim() === '') {
-          alert(`${row.name}の店舗を選択または入力してください`);
-          return false;
+          alert(`${getUserName(shift.manager_number)}の店舗を選択または入力してください`);
+          setLoading(false);
+          return;
         }
 
-        const startTime = row.isOff 
+        const startTime = shift.is_off 
           ? null 
-          : `${String(row.startHour).padStart(2, '0')}:${String(row.startMin).padStart(2, '0')}:00`;
-        const endTime = row.isOff 
+          : `${String(shift.startHour).padStart(2, '0')}:${String(shift.startMin).padStart(2, '0')}:00`;
+        const endTime = shift.is_off 
           ? null 
-          : `${String(row.endHour).padStart(2, '0')}:${String(row.endMin).padStart(2, '0')}:00`;
+          : `${String(shift.endHour).padStart(2, '0')}:${String(shift.endMin).padStart(2, '0')}:00`;
 
         const updateData = {
-          date: selectedDate,
-          manager_number: row.manager_number,
+          date: shift.date,
+          manager_number: shift.manager_number,
           start_time: startTime,
           end_time: endTime,
-          is_off: row.isOff,
-          store: storeValue
+          store: storeValue,
+          is_off: shift.is_off
         };
 
         const { error } = await supabase
@@ -244,317 +255,226 @@ function ManagerCreate() {
           });
 
         if (error) {
-          console.error(`${row.name} の保存エラー:`, error);
-          alert(`${row.name} の保存に失敗しました: ${error.message}`);
-          return false;
+          console.error(`${getUserName(shift.manager_number)} の保存エラー:`, error);
+          alert(`${getUserName(shift.manager_number)} の保存に失敗しました: ${error.message}`);
+          setLoading(false);
+          return;
         }
       }
 
-      return true;
+      alert('シフトを更新しました');
+      setIsEditing(false);
+      setShowTimeline(false);
+      fetchShiftData(selectedDate);
       
     } catch (error) {
-      console.error('予期しないエラー:', error);
       alert(`エラーが発生しました: ${error.message}`);
-      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handlePreviousDay = async () => {
-    if (currentDateIndex > 0) {
-      const saveSuccess = await handleSave();
-      if (saveSuccess) {
-        handleEditStart(currentDateIndex - 1);
-      }
+  const generateCalendarDays = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+    const days = [];
+    const currentDate = new Date(startDate);
+
+    for (let i = 0; i < 42; i++) {
+      const dateStr = getDateString(currentDate);
+      const isCurrentMonth = currentDate.getMonth() === month;
+      const hasShift = availableDates.includes(dateStr);
+
+      days.push({
+        date: new Date(currentDate),
+        dateStr: dateStr,
+        day: currentDate.getDate(),
+        isCurrentMonth,
+        hasShift
+      });
+
+      currentDate.setDate(currentDate.getDate() + 1);
     }
+
+    return days;
   };
 
-  const handleNextDay = async () => {
-    if (currentDateIndex < dates.length - 1) {
-      const saveSuccess = await handleSave();
-      if (saveSuccess) {
-        handleEditStart(currentDateIndex + 1);
-      }
-    }
+  const changeMonth = (delta) => {
+    const newMonth = new Date(currentMonth);
+    newMonth.setMonth(newMonth.getMonth() + delta);
+    setCurrentMonth(newMonth);
   };
 
-  const handleSaveAndExit = async () => {
-    const saveSuccess = await handleSave();
-    if (saveSuccess) {
-      alert('保存しました');
-      setIsEditing(false);
-      fetchShiftData();
-    }
+  const formatTime = (timeStr) => {
+    if (!timeStr) return '';
+    const timeParts = timeStr.split(':');
+    return `${timeParts[0]}:${timeParts[1]}`;
   };
 
+  const getWeekday = (dateStr) => {
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    const date = new Date(dateStr + 'T00:00:00');
+    return days[date.getDay()];
+  };
+
+  const isOffDay = (shift) => {
+    return shift.is_off === true ||
+           !shift.start_time ||
+           !shift.end_time ||
+           shift.start_time === '' ||
+           shift.end_time === '' ||
+           (shift.start_time === '00:00' && shift.end_time === '00:00') ||
+           (shift.start_time === '00:00:00' && shift.end_time === '00:00:00');
+  };
+
+  const calendarDays = generateCalendarDays();
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   const timeSlots = generateTimeSlots();
 
-  if (!showTable) {
-    return (
-      <div className="login-wrapper" style={{ padding: '1rem', boxSizing: 'border-box' }}>
-        <div className="login-card" style={{ maxWidth: '500px', width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
-          <h2>シフト作成</h2>
-          <p style={{ fontSize: '0.9rem', color: '#666', marginBottom: '1rem' }}>
-            シフト作成時に1年半前の古いデータは自動削除されます
-          </p>
-          <label>開始日:</label>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          <label>終了日:</label>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          <div style={{ marginTop: '1rem' }}>
-            <button onClick={fetchShiftData}>次へ</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const sortedShiftData = [...(isEditing ? editingShifts : shiftData)].sort((a, b) => {
+    const aOff = isOffDay(a) ? 1 : 0;
+    const bOff = isOffDay(b) ? 1 : 0;
+    return aOff - bOff;
+  });
 
-  if (isEditing) {
+  if (currentView === 'calendar') {
     return (
-      <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box', overflow: 'hidden' }}>
-        {isPortrait && (
+      <div className="login-wrapper" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
+        <div className="login-card" style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', padding: '1rem' }}>
+          <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.5rem)' }}>シフト確認（店長）</h2>
+
           <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            zIndex: 9999,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            color: 'white',
-            padding: '2rem',
-            textAlign: 'center'
+            marginTop: '1rem',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            padding: '1rem',
+            backgroundColor: '#f9f9f9',
+            boxSizing: 'border-box'
           }}>
-            <div style={{ fontSize: '4rem', marginBottom: '2rem', animation: 'rotate 2s ease-in-out infinite' }}>
-              📱→📱
-            </div>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>画面を横向きにしてください</h2>
-            <p style={{ fontSize: '1rem', color: '#ccc' }}>シフト編集画面は横向きでの使用を推奨します</p>
-            <style>{`
-              @keyframes rotate {
-                0%, 100% { transform: rotate(0deg); }
-                50% { transform: rotate(90deg); }
-              }
-            `}</style>
-          </div>
-        )}
-        <div className="login-card" style={{ position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box', padding: '1rem' }}>
-          <div style={{ position: 'absolute', top: '0.5rem', left: '0.5rem', right: '0.5rem', display: 'flex', justifyContent: 'space-between', zIndex: 10, gap: '0.5rem' }}>
-            {currentDateIndex > 0 ? (
-              <button onClick={handlePreviousDay} className="nav-button-small" style={{ flex: '0 0 auto', minWidth: '60px', padding: '0.3rem 0.5rem', fontSize: '0.8rem', marginLeft: '3rem' }}>
-                前の日
-              </button>
-            ) : (
-              <div style={{ flex: '0 0 auto', minWidth: '60px', marginLeft: '3rem' }}></div>
-            )}
-            <div style={{ flex: 1 }}></div>
-            {currentDateIndex < dates.length - 1 && (
-              <button onClick={handleNextDay} className="nav-button-small" style={{ flex: '0 0 auto', minWidth: '60px', padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}>
-                次の日
-              </button>
-            )}
-          </div>
-
-          <div style={{ position: 'relative', display: 'inline-block', marginTop: '3rem', maxWidth: '100%' }}>
-            <h2 
-              onClick={() => setShowDateDropdown(!showDateDropdown)}
-              style={{ cursor: 'pointer', userSelect: 'none', display: 'inline-block', fontSize: 'clamp(1rem, 4vw, 1.5rem)', margin: 0 }}
-            >
-              {selectedDate} のシフト入力 ▼
-            </h2>
-            {showDateDropdown && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                backgroundColor: 'white',
-                border: '1px solid #ccc',
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem',
+              gap: '0.5rem'
+            }}>
+              <button onClick={() => changeMonth(-1)} style={{
+                backgroundColor: '#607D8B',
+                color: 'white',
+                border: 'none',
                 borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                zIndex: 1000,
-                minWidth: '150px',
-                maxHeight: '300px',
-                overflowY: 'auto'
+                padding: '0.5rem',
+                cursor: 'pointer',
+                minWidth: '40px'
               }}>
-                {dates.map((date, index) => (
-                  <div
-                    key={date}
-                    onClick={() => handleDateSelect(index)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      cursor: 'pointer',
-                      backgroundColor: index === currentDateIndex ? '#f0f0f0' : 'white',
-                      borderBottom: index < dates.length - 1 ? '1px solid #eee' : 'none'
-                    }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = index === currentDateIndex ? '#f0f0f0' : 'white'}
-                  >
-                    {date}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div style={{ overflowX: 'auto', overflowY: 'auto', marginTop: '1rem', width: '100%', position: 'relative', maxHeight: 'calc(100vh - 180px)', WebkitOverflowScrolling: 'touch' }}>
-            <table className="shift-edit-table" style={{ borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-              <thead>
-                <tr>
-                  <th style={{ minWidth: '35px', width: '35px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>名前</th>
-                  <th style={{ minWidth: '30px', width: '30px', position: 'sticky', left: '35px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>店舗</th>
-                  <th style={{ minWidth: '60px', width: '60px', position: 'sticky', left: '65px', zIndex: 3, backgroundColor: '#FFDAB9', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>備考</th>
-                  <th style={{ minWidth: '25px', width: '25px', position: 'sticky', left: '125px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>休</th>
-                  <th style={{ minWidth: '85px', width: '85px', position: 'sticky', left: '150px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>開始</th>
-                  <th style={{ minWidth: '85px', width: '85px', position: 'sticky', left: '235px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', color: 'black', fontSize: '0.65rem', padding: '0.1rem' }}>終了</th>
-                  {timeSlots.map((t, i) => (
-                    <th key={i} style={{ minWidth: '28px', width: '28px', backgroundColor: '#F0E68C', border: '1px solid #ddd', color: 'black', fontSize: '0.7rem', padding: '0.1rem' }}>{t}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {editRows.map((row, rowIndex) => {
-                  const originalStartStr = row.originalStartHour && row.originalStartMin 
-                    ? `${String(row.originalStartHour).padStart(2, '0')}:${String(row.originalStartMin).padStart(2, '0')}` 
-                    : '00:00';
-                  const originalEndStr = row.originalEndHour && row.originalEndMin 
-                    ? `${String(row.originalEndHour).padStart(2, '0')}:${String(row.originalEndMin).padStart(2, '0')}` 
-                    : '00:00';
-                  const finalStartStr = `${String(row.startHour).padStart(2, '0')}:${String(row.startMin).padStart(2, '0')}`;
-                  const finalEndStr = `${String(row.endHour).padStart(2, '0')}:${String(row.endMin).padStart(2, '0')}`;
+                ◀
+              </button>
+              <h3 style={{ margin: 0, fontSize: 'clamp(1rem, 4vw, 1.2rem)', textAlign: 'center', flex: 1 }}>
+                {currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月
+              </h3>
+              <button onClick={() => changeMonth(1)} style={{
+                backgroundColor: '#607D8B',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                minWidth: '40px'
+              }}>
+                ▶
+              </button>
+            </div>
 
-                  return (
-                    <tr key={rowIndex} className={row.isOff ? 'off-row' : ''}>
-                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', minWidth: '35px', width: '35px', padding: '0.1rem', border: '1px solid #ddd', fontSize: '0.65rem' }}>{row.name}</td>
-                      <td style={{ position: 'sticky', left: '35px', zIndex: 2, backgroundColor: 'white', minWidth: '30px', width: '30px', padding: '0.1rem', border: '1px solid #ddd' }}>
-                        {row.isEditingStore ? (
-                          <input
-                            type="text"
-                            value={row.store}
-                            onChange={(e) => handleStoreInputChange(rowIndex, e.target.value)}
-                            onBlur={() => toggleStoreEdit(rowIndex)}
-                            autoFocus
-                            placeholder="店舗"
-                            style={{
-                              padding: '0.05rem',
-                              border: '1px solid #2196F3',
-                              borderRadius: '2px',
-                              width: '100%',
-                              boxSizing: 'border-box',
-                              fontSize: '0.65rem'
-                            }}
-                          />
-                        ) : (
-                          <div
-                            onClick={() => toggleStoreEdit(rowIndex)}
-                            style={{
-                              padding: '0.05rem',
-                              cursor: 'pointer',
-                              backgroundColor: 'white',
-                              textAlign: 'center',
-                              fontSize: '0.65rem',
-                              minHeight: '16px'
-                            }}
-                          >
-                            {row.store || 'A'}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ position: 'sticky', left: '65px', zIndex: 2, backgroundColor: 'white', minWidth: '60px', width: '60px', padding: '0.1rem', fontSize: '0.6rem', color: '#666', border: '1px solid #ddd', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {row.remarks || ''}
-                      </td>
-                      <td style={{ position: 'sticky', left: '125px', zIndex: 2, backgroundColor: 'white', minWidth: '25px', width: '25px', padding: '0.1rem', border: '1px solid #ddd', textAlign: 'center' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={row.isOff}
-                          onChange={e => handleCheckboxChange(rowIndex, e.target.checked)}
-                        />
-                      </td>
-                      <td style={{ position: 'sticky', left: '150px', zIndex: 2, backgroundColor: 'white', minWidth: '85px', width: '85px', padding: '0.1rem', border: '1px solid #ddd' }}>
-                        <div style={{ display: 'flex', gap: '1px', alignItems: 'center' }}>
-                          <select
-                            value={row.startHour}
-                            onChange={e => handleTimeChange(rowIndex, 'startHour', e.target.value)}
-                            disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
-                          >
-                            {[...Array(37)].map((_, h) => (
-                              <option key={h} value={h}>{h}</option>
-                            ))}
-                          </select>
-                          <span style={{ fontSize: '0.65rem' }}>:</span>
-                          <select
-                            value={row.startMin}
-                            onChange={e => handleTimeChange(rowIndex, 'startMin', e.target.value)}
-                            disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
-                          >
-                            {[...Array(60)].map((_, m) => (
-                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-                      <td style={{ position: 'sticky', left: '235px', zIndex: 2, backgroundColor: 'white', minWidth: '85px', width: '85px', padding: '0.1rem', border: '1px solid #ddd' }}>
-                        <div style={{ display: 'flex', gap: '1px', alignItems: 'center' }}>
-                          <select
-                            value={row.endHour}
-                            onChange={e => handleTimeChange(rowIndex, 'endHour', e.target.value)}
-                            disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
-                          >
-                            {[...Array(37)].map((_, h) => (
-                              <option key={h} value={h}>{h}</option>
-                            ))}
-                          </select>
-                          <span style={{ fontSize: '0.65rem' }}>:</span>
-                          <select
-                            value={row.endMin}
-                            onChange={e => handleTimeChange(rowIndex, 'endMin', e.target.value)}
-                            disabled={row.isOff}
-                            style={{ flex: 1, fontSize: '0.65rem', padding: '0.05rem' }}
-                          >
-                            {[...Array(60)].map((_, m) => (
-                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-                      {timeSlots.map((slot, colIndex) => {
-                        const inRequest = slot >= originalStartStr && slot < originalEndStr;
-                        const inFinal = slot >= finalStartStr && slot < finalEndStr;
-                        let bgColor = 'transparent';
-                        
-                        if (row.isOff) {
-                          bgColor = '#e0e0e0';
-                        } else {
-                          if (inRequest) {
-                            bgColor = '#ffff99';
-                          }
-                          
-                          if (inFinal) {
-                            if (inRequest) {
-                              bgColor = '#90EE90';
-                            } else {
-                              bgColor = '#ff9999';
-                            }
-                          }
-                        }
-                        
-                        return <td key={colIndex} style={{ backgroundColor: bgColor, minWidth: '28px', width: '28px', border: '1px solid #ddd' }} />;
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '2px',
+              marginBottom: '0.5rem'
+            }}>
+              {weekdays.map(day => (
+                <div key={day} style={{
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  padding: '0.5rem',
+                  backgroundColor: '#e0e0e0',
+                  fontSize: 'clamp(0.7rem, 3vw, 0.9rem)'
+                }}>
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '2px'
+            }}>
+              {calendarDays.map((dayInfo, index) => (
+                <button
+                  key={index}
+                  onClick={() => dayInfo.hasShift && handleDateSelect(dayInfo.dateStr)}
+                  disabled={!dayInfo.hasShift}
+                  style={{
+                    padding: '0.5rem',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: dayInfo.hasShift ? 'pointer' : 'not-allowed',
+                    backgroundColor: dayInfo.hasShift ? '#E3F2FD' :
+                                   dayInfo.isCurrentMonth ? 'white' : '#f0f0f0',
+                    color: !dayInfo.hasShift ? '#999' :
+                           dayInfo.isCurrentMonth ? 'black' : '#666',
+                    fontWeight: dayInfo.hasShift ? 'bold' : 'normal',
+                    opacity: dayInfo.isCurrentMonth ? 1 : 0.5,
+                    transition: 'all 0.3s ease',
+                    fontSize: 'clamp(0.7rem, 3vw, 0.9rem)',
+                    minHeight: '40px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (dayInfo.hasShift) {
+                      e.target.style.backgroundColor = '#BBDEFB';
+                      e.target.style.transform = 'scale(1.05)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (dayInfo.hasShift) {
+                      e.target.style.backgroundColor = '#E3F2FD';
+                      e.target.style.transform = 'scale(1)';
+                    }
+                  }}
+                >
+                  {dayInfo.day}
+                </button>
+              ))}
+            </div>
+
+            <div style={{
+              marginTop: '0.5rem',
+              fontSize: 'clamp(0.7rem, 3vw, 0.8rem)',
+              color: '#666',
+              textAlign: 'center'
+            }}>
+              青色: シフトあり ({availableDates.length}日) | 灰色: シフトなし
+            </div>
           </div>
-          
-          <div style={{ marginTop: '1rem', textAlign: 'center', paddingBottom: '1rem' }}>
-            <button onClick={handleSaveAndExit} className="save-button-small" style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem' }}>
-              確定
+
+          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+            <button onClick={onBack} style={{
+              backgroundColor: '#607D8B',
+              color: 'white',
+              padding: '0.75rem 2rem',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: 'clamp(0.9rem, 3.5vw, 1rem)',
+              width: '100%',
+              maxWidth: '300px'
+            }}>
+              メニューに戻る
             </button>
           </div>
         </div>
@@ -563,39 +483,491 @@ function ManagerCreate() {
   }
 
   return (
-    <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
-      <div className="login-card" style={{ maxWidth: '100%', width: '100%', boxSizing: 'border-box', padding: '1rem' }}>
-        <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.5rem)' }}>シフト表</h2>
-        <div className="shift-table-wrapper" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 'calc(100vh - 200px)', WebkitOverflowScrolling: 'touch' }}>
-          <table className="shift-table">
-            <thead>
-              <tr>
-                <th>名前</th>
-                {dates.map(date => (
-                  <th key={date}>{date}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(groupedByUser).map(([name, shifts]) => (
-                <tr key={name}>
-                  <td>{name}</td>
-                  {dates.map(date => (
-                    <td key={date}>{shifts[date] || ''}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="login-wrapper" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
+      {isPortrait && showTimeline && isEditing && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: 'white',
+          padding: '2rem',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '2rem', animation: 'rotate 2s ease-in-out infinite' }}>
+            📱→📱
+          </div>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>画面を横向きにしてください</h2>
+          <p style={{ fontSize: '1rem', color: '#ccc' }}>タイムライン表示は横向きでの使用を推奨します</p>
+          <style>{`
+            @keyframes rotate {
+              0%, 100% { transform: rotate(0deg); }
+              50% { transform: rotate(90deg); }
+            }
+          `}</style>
         </div>
-        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
-          <button onClick={() => handleEditStart(0)} style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', width: 'auto', minWidth: '100px' }}>
-            作成
+      )}
+      <div className="login-card" style={{ width: showTimeline ? '95vw' : '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', padding: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1rem', maxWidth: '600px', margin: '0 auto 1rem' }}>
+          <button onClick={() => changeDate(-1)} style={{ minWidth: '40px', padding: '0.5rem', backgroundColor: '#607D8B', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '1rem' }}>◀</button>
+          <h2 style={{ fontSize: 'clamp(1rem, 4vw, 1.5rem)', margin: 0, textAlign: 'center', flex: 1 }}>
+            {selectedDate} ({getWeekday(selectedDate)})
+          </h2>
+          <button onClick={() => changeDate(1)} style={{ minWidth: '40px', padding: '0.5rem', backgroundColor: '#607D8B', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '1rem' }}>▶</button>
+        </div>
+
+        <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', maxWidth: '600px', margin: '0 auto 1rem' }}>
+          <button
+            onClick={handleEditToggle}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: isEditing ? '#FF9800' : '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(0.8rem, 3vw, 0.9rem)'
+            }}
+          >
+            {isEditing ? 'キャンセル' : '変更モード'}
+          </button>
+          <button
+            onClick={toggleTimeline}
+            disabled={!isEditing}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: !isEditing ? '#ccc' : (showTimeline ? '#9C27B0' : '#673AB7'),
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isEditing ? 'pointer' : 'not-allowed',
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(0.8rem, 3vw, 0.9rem)',
+              opacity: !isEditing ? 0.6 : 1
+            }}
+          >
+            {showTimeline ? 'リスト' : 'タイムライン'}
+          </button>
+          <button
+            onClick={handleUpdate}
+            disabled={loading || !isEditing}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: (!isEditing || loading) ? '#ccc' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: (loading || !isEditing) ? 'not-allowed' : 'pointer',
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(0.8rem, 3vw, 0.9rem)',
+              opacity: (!isEditing || loading) ? 0.6 : 1
+            }}
+          >
+            {loading ? '更新中...' : '更新'}
+          </button>
+          <button
+            onClick={handleBackToCalendar}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#607D8B',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              fontSize: 'clamp(0.8rem, 3vw, 0.9rem)'
+            }}
+          >
+            カレンダー
           </button>
         </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            読み込み中...
+          </div>
+        ) : sortedShiftData.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: '#666',
+            backgroundColor: '#f9f9f9',
+            borderRadius: '8px'
+          }}>
+            この日のシフトはありません
+          </div>
+        ) : showTimeline && isEditing ? (
+          <div style={{ overflowX: 'auto', overflowY: 'auto', marginTop: '1rem', width: '100%', maxHeight: 'calc(100vh - 250px)', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1200px' }}>
+              <thead>
+                <tr>
+                  <th style={{ minWidth: '80px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>名前</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', left: '80px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>店舗</th>
+                  <th style={{ minWidth: '40px', position: 'sticky', left: '140px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>休</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '180px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>開始</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '300px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>終了</th>
+                  {timeSlots.map((slot, i) => (
+                    <th key={i} style={{ minWidth: '30px', width: '30px', backgroundColor: '#F0E68C', border: '1px solid #ddd', fontSize: '0.7rem', padding: '0.2rem' }}>
+                      {slot}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedShiftData.map((shift, index) => {
+                  const editingShift = editingShifts.find(es => es.id === shift.id || 
+                                                                  (es.manager_number === shift.manager_number && !shift.id)) || shift;
+                  
+                  const startTimeStr = formatTime36(editingShift.startHour || 0, editingShift.startMin || 0);
+                  const endTimeStr = formatTime36(editingShift.endHour || 0, editingShift.endMin || 0);
+                  
+                  return (
+                    <tr key={shift.id || shift.manager_number || index}>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>
+                        <strong>{getUserName(shift.manager_number)}</strong>
+                      </td>
+                      <td style={{ position: 'sticky', left: '80px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <input
+                          type="text"
+                          value={editingShift.store || ''}
+                          onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'store', e.target.value)}
+                          placeholder="店舗"
+                          style={{
+                            padding: '0.3rem',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      </td>
+                      <td style={{ position: 'sticky', left: '140px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={editingShift.is_off || false}
+                          onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'is_off', e.target.checked)}
+                          style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ position: 'sticky', left: '180px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                          <select
+                            value={editingShift.startHour || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(37)].map((_, h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <select
+                            value={editingShift.startMin || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startMin', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(60)].map((_, m) => (
+                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td style={{ position: 'sticky', left: '300px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
+                        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                          <select
+                            value={editingShift.endHour || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(37)].map((_, h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <select
+                            value={editingShift.endMin || 0}
+                            onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endMin', parseInt(e.target.value))}
+                            disabled={editingShift.is_off}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                          >
+                            {[...Array(60)].map((_, m) => (
+                              <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      {timeSlots.map((slot, colIndex) => {
+                        const inShift = !editingShift.is_off && 
+                                       slot >= startTimeStr && 
+                                       slot < endTimeStr;
+                        
+                        let bgColor = 'transparent';
+                        if (editingShift.is_off) {
+                          bgColor = '#e0e0e0';
+                        } else if (inShift) {
+                          bgColor = '#90EE90';
+                        }
+                        
+                        return (
+                          <td key={colIndex} style={{ 
+                            backgroundColor: bgColor, 
+                            minWidth: '30px', 
+                            width: '30px', 
+                            border: '1px solid #ddd',
+                            padding: 0
+                          }} />
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isEditing ? '800px' : '500px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                    名前
+                  </th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                    店舗
+                  </th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                    勤務時間
+                  </th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                    状態
+                  </th>
+                  {isEditing && (
+                    <>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                        店舗変更
+                      </th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                        開始
+                      </th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                        終了
+                      </th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                        休み
+                      </th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedShiftData.map((shift, displayIndex) => {
+                  const editingShift = isEditing ? 
+                    editingShifts.find(es => es.id === shift.id || 
+                                              (es.manager_number === shift.manager_number && !shift.id)) || shift 
+                    : shift;
+                  
+                  return (
+                    <tr key={shift.id || shift.manager_number || displayIndex} style={{
+                      backgroundColor: displayIndex % 2 === 0 ? 'white' : '#f9f9f9'
+                    }}>
+                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                        <strong>{getUserName(shift.manager_number)}</strong>
+                      </td>
+                      <td style={{
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee',
+                        fontWeight: 'bold',
+                        color: '#1976D2',
+                        fontSize: 'clamp(0.8rem, 3vw, 0.9rem)'
+                      }}>
+                        {(isEditing ? editingShift.store : shift.store) ? `${isEditing ? editingShift.store : shift.store}店舗` : '-'}
+                      </td>
+                      <td style={{
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee',
+                        fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)'
+                      }}>
+                        {!isEditing ? (
+                          isOffDay(shift) ? (
+                            <span style={{ color: '#999', fontStyle: 'italic' }}>休み</span>
+                          ) : (
+                            <span style={{ fontWeight: 'bold' }}>
+                              {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                            </span>
+                          )
+                        ) : (
+                          editingShift.is_off ? (
+                            <span style={{ color: '#999', fontStyle: 'italic' }}>休み</span>
+                          ) : (
+                            <span style={{ fontWeight: 'bold' }}>
+                              {formatTime36(editingShift.startHour || 0, editingShift.startMin || 0)} - {formatTime36(editingShift.endHour || 0, editingShift.endMin || 0)}
+                            </span>
+                          )
+                        )}
+                      </td>
+                      <td style={{
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #eee'
+                      }}>
+                        <span style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '12px',
+                          fontSize: 'clamp(0.7rem, 2.5vw, 0.8rem)',
+                          backgroundColor: (isEditing ? editingShift.is_off : isOffDay(shift)) ? '#f44336' : '#4CAF50',
+                          color: 'white'
+                        }}>
+                          {(isEditing ? editingShift.is_off : isOffDay(shift)) ? '休み' : '出勤'}
+                        </span>
+                      </td>
+                      {isEditing && (
+                        <>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="text"
+                              value={editingShift.store || ''}
+                              onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'store', e.target.value)}
+                              placeholder="店舗名"
+                              style={{
+                                padding: '0.5rem',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                width: '80px',
+                                textAlign: 'center',
+                                fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <select
+                                value={editingShift.startHour || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white',
+                                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {[...Array(37)].map((_, h) => (
+                                  <option key={h} value={h}>{h}</option>
+                                ))}
+                              </select>
+                              <span style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)' }}>:</span>
+                              <select
+                                value={editingShift.startMin || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startMin', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white',
+                                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {[...Array(60)].map((_, m) => (
+                                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <select
+                                value={editingShift.endHour || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white',
+                                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {[...Array(37)].map((_, h) => (
+                                  <option key={h} value={h}>{h}</option>
+                                ))}
+                              </select>
+                              <span style={{ fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)' }}>:</span>
+                              <select
+                                value={editingShift.endMin || 0}
+                                onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endMin', parseInt(e.target.value))}
+                                disabled={editingShift.is_off}
+                                style={{
+                                  padding: '0.5rem',
+                                  border: '1px solid #ddd',
+                                  borderRadius: '4px',
+                                  opacity: editingShift.is_off ? 0.5 : 1,
+                                  width: '60px',
+                                  backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white',
+                                  fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                {[...Array(60)].map((_, m) => (
+                                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="checkbox"
+                              checked={editingShift.is_off || false}
+                              onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'is_off', e.target.checked)}
+                              style={{ 
+                                transform: 'scale(1.2)',
+                                cursor: 'pointer'
+                              }}
+                            />
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default ManagerCreate;
+export default ManagerShiftView;
