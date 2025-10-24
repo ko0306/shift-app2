@@ -31,12 +31,15 @@ function ManagerShiftView({ onBack }) {
   useEffect(() => {
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
+      console.log('Orientation check:', { width: window.innerWidth, height: window.innerHeight, portrait });
       setIsPortrait(portrait);
     };
 
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(checkOrientation, 100);
+    });
 
     return () => {
       window.removeEventListener('resize', checkOrientation);
@@ -484,7 +487,7 @@ function ManagerShiftView({ onBack }) {
 
   return (
     <div className="login-wrapper" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
-      {isPortrait && showTimeline && isEditing && (
+      {isPortrait && isEditing && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -505,7 +508,9 @@ function ManagerShiftView({ onBack }) {
             📱→📱
           </div>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: 'white' }}>画面を横向きにしてください</h2>
-          <p style={{ fontSize: '1rem', color: '#ccc' }}>タイムライン表示は横向きでの使用を推奨します</p>
+          <p style={{ fontSize: '1rem', color: '#ccc' }}>
+            {showTimeline ? 'タイムライン表示' : '変更モード'}は横向きでの使用を推奨します
+          </p>
           <style>{`
             @keyframes rotate {
               0%, 100% { transform: rotate(0deg); }
@@ -609,13 +614,13 @@ function ManagerShiftView({ onBack }) {
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '1200px' }}>
               <thead>
                 <tr>
-                  <th style={{ minWidth: '80px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>名前</th>
-                  <th style={{ minWidth: '60px', position: 'sticky', left: '80px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>店舗</th>
-                  <th style={{ minWidth: '40px', position: 'sticky', left: '140px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>休</th>
-                  <th style={{ minWidth: '120px', position: 'sticky', left: '180px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>開始</th>
-                  <th style={{ minWidth: '120px', position: 'sticky', left: '300px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>終了</th>
+                  <th style={{ minWidth: '80px', position: 'sticky', left: 0, zIndex: 3, backgroundColor: '#FFB6C1', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>名前</th>
+                  <th style={{ minWidth: '60px', position: 'sticky', left: '80px', zIndex: 3, backgroundColor: '#ADD8E6', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>店舗</th>
+                  <th style={{ minWidth: '40px', position: 'sticky', left: '140px', zIndex: 3, backgroundColor: '#E6E6FA', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>休</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '180px', zIndex: 3, backgroundColor: '#98FB98', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>開始</th>
+                  <th style={{ minWidth: '120px', position: 'sticky', left: '300px', zIndex: 3, backgroundColor: '#FFE4B5', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>終了</th>
                   {timeSlots.map((slot, i) => (
-                    <th key={i} style={{ minWidth: '30px', width: '30px', backgroundColor: '#F0E68C', border: '1px solid #ddd', fontSize: '0.7rem', padding: '0.2rem' }}>
+                    <th key={i} style={{ minWidth: '30px', width: '30px', backgroundColor: '#F0E68C', border: '1px solid #ddd', fontSize: '0.7rem', padding: '0.2rem', color: 'black' }}>
                       {slot}
                     </th>
                   ))}
@@ -631,7 +636,7 @@ function ManagerShiftView({ onBack }) {
                   
                   return (
                     <tr key={shift.id || shift.manager_number || index}>
-                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem' }}>
+                      <td style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.5rem', fontSize: '0.9rem', color: 'black' }}>
                         <strong>{getUserName(shift.manager_number)}</strong>
                       </td>
                       <td style={{ position: 'sticky', left: '80px', zIndex: 2, backgroundColor: 'white', border: '1px solid #ddd', padding: '0.3rem' }}>
@@ -646,7 +651,8 @@ function ManagerShiftView({ onBack }) {
                             borderRadius: '4px',
                             width: '100%',
                             boxSizing: 'border-box',
-                            fontSize: '0.85rem'
+                            fontSize: '0.85rem',
+                            color: 'black'
                           }}
                         />
                       </td>
@@ -664,18 +670,18 @@ function ManagerShiftView({ onBack }) {
                             value={editingShift.startHour || 0}
                             onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
                             disabled={editingShift.is_off}
-                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white', color: 'black' }}
                           >
                             {[...Array(37)].map((_, h) => (
                               <option key={h} value={h}>{h}</option>
                             ))}
                           </select>
-                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <span style={{ fontSize: '0.8rem', color: 'black' }}>:</span>
                           <select
                             value={editingShift.startMin || 0}
                             onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startMin', parseInt(e.target.value))}
                             disabled={editingShift.is_off}
-                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white', color: 'black' }}
                           >
                             {[...Array(60)].map((_, m) => (
                               <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -689,18 +695,18 @@ function ManagerShiftView({ onBack }) {
                             value={editingShift.endHour || 0}
                             onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
                             disabled={editingShift.is_off}
-                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white', color: 'black' }}
                           >
                             {[...Array(37)].map((_, h) => (
                               <option key={h} value={h}>{h}</option>
                             ))}
                           </select>
-                          <span style={{ fontSize: '0.8rem' }}>:</span>
+                          <span style={{ fontSize: '0.8rem', color: 'black' }}>:</span>
                           <select
                             value={editingShift.endMin || 0}
                             onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endMin', parseInt(e.target.value))}
                             disabled={editingShift.is_off}
-                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white' }}
+                            style={{ flex: 1, fontSize: '0.8rem', padding: '0.2rem', backgroundColor: editingShift.is_off ? '#f5f5f5' : 'white', color: 'black' }}
                           >
                             {[...Array(60)].map((_, m) => (
                               <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -744,33 +750,33 @@ function ManagerShiftView({ onBack }) {
             overflowX: 'auto',
             WebkitOverflowScrolling: 'touch'
           }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isEditing ? '800px' : '500px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isEditing ? '1000px' : '500px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f5f5f5' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                     名前
                   </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                     店舗
                   </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                     勤務時間
                   </th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                  <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                     状態
                   </th>
                   {isEditing && (
                     <>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                         店舗変更
                       </th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                         開始
                       </th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                         終了
                       </th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #ddd', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                         休み
                       </th>
                     </>
@@ -788,7 +794,7 @@ function ManagerShiftView({ onBack }) {
                     <tr key={shift.id || shift.manager_number || displayIndex} style={{
                       backgroundColor: displayIndex % 2 === 0 ? 'white' : '#f9f9f9'
                     }}>
-                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)' }}>
+                      <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', fontSize: 'clamp(0.8rem, 3vw, 0.9rem)', whiteSpace: 'nowrap' }}>
                         <strong>{getUserName(shift.manager_number)}</strong>
                       </td>
                       <td style={{
@@ -797,7 +803,8 @@ function ManagerShiftView({ onBack }) {
                         borderBottom: '1px solid #eee',
                         fontWeight: 'bold',
                         color: '#1976D2',
-                        fontSize: 'clamp(0.8rem, 3vw, 0.9rem)'
+                        fontSize: 'clamp(0.8rem, 3vw, 0.9rem)',
+                        whiteSpace: 'nowrap'
                       }}>
                         {(isEditing ? editingShift.store : shift.store) ? `${isEditing ? editingShift.store : shift.store}店舗` : '-'}
                       </td>
@@ -805,7 +812,8 @@ function ManagerShiftView({ onBack }) {
                         padding: '0.75rem',
                         textAlign: 'center',
                         borderBottom: '1px solid #eee',
-                        fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)'
+                        fontSize: 'clamp(0.75rem, 2.5vw, 0.85rem)',
+                        whiteSpace: 'nowrap'
                       }}>
                         {!isEditing ? (
                           isOffDay(shift) ? (
@@ -835,14 +843,15 @@ function ManagerShiftView({ onBack }) {
                           borderRadius: '12px',
                           fontSize: 'clamp(0.7rem, 2.5vw, 0.8rem)',
                           backgroundColor: (isEditing ? editingShift.is_off : isOffDay(shift)) ? '#f44336' : '#4CAF50',
-                          color: 'white'
+                          color: 'white',
+                          whiteSpace: 'nowrap'
                         }}>
                           {(isEditing ? editingShift.is_off : isOffDay(shift)) ? '休み' : '出勤'}
                         </span>
                       </td>
                       {isEditing && (
                         <>
-                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
                             <input
                               type="text"
                               value={editingShift.store || ''}
@@ -859,8 +868,8 @@ function ManagerShiftView({ onBack }) {
                               }}
                             />
                           </td>
-                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' }}>
                               <select
                                 value={editingShift.startHour || 0}
                                 onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'startHour', parseInt(e.target.value))}
@@ -902,8 +911,8 @@ function ManagerShiftView({ onBack }) {
                               </select>
                             </div>
                           </td>
-                          <td style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <td style={{ padding: '0.5rem', textAlign: 'center', borderBottom: '1px solid #eee' }}>
+                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap' }}>
                               <select
                                 value={editingShift.endHour || 0}
                                 onChange={(e) => handleShiftChange(shift.id || shift.manager_number, 'endHour', parseInt(e.target.value))}
