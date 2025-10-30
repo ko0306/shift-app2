@@ -1,6 +1,191 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// ヘルプモーダルコンポーネント
+const HelpModal = ({ isOpen, onClose, content }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      zIndex: 2000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }} onClick={onClose}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '80vh',
+        overflow: 'auto',
+        position: 'relative',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+      }} onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'sticky',
+            top: '1rem',
+            left: '100%',
+            marginRight: '1rem',
+            backgroundColor: '#FF5722',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 1,
+            fontSize: '24px',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+        <div style={{ padding: '2rem', paddingTop: '0' }}>
+          {content}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ヘルプコンテンツ
+const getHelpContent = (page) => {
+  const contents = {
+    calendar: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>シフト確認カレンダーの使い方</h2>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='350'%3E%3Crect width='400' height='350' fill='%23f5f5f5'/%3E%3Crect x='30' y='30' width='340' height='290' rx='10' fill='white' stroke='%231976D2' stroke-width='2'/%3E%3Ctext x='200' y='60' text-anchor='middle' font-size='16' font-weight='bold'%3E2025年 1月%3C/text%3E%3Crect x='50' y='75' width='300' height='200' rx='8' fill='%23f9f9f9' stroke='%23ddd'/%3E%3Ctext x='65' y='95' font-size='11' fill='%23666'%3E日 月 火 水 木 金 土%3C/text%3E%3Crect x='60' y='105' width='35' height='30' rx='4' fill='%23E3F2FD' stroke='%232196F3'/%3E%3Ctext x='77' y='125' text-anchor='middle' font-size='12' fill='%23000'%3E15%3C/text%3E%3Crect x='100' y='105' width='35' height='30' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='117' y='125' text-anchor='middle' font-size='12' fill='%23999'%3E16%3C/text%3E%3Crect x='140' y='105' width='35' height='30' rx='4' fill='%23E3F2FD' stroke='%232196F3'/%3E%3Ctext x='157' y='125' text-anchor='middle' font-size='12' fill='%23000'%3E17%3C/text%3E%3Crect x='130' y='285' width='140' height='25' rx='6' fill='%23607D8B'/%3E%3Ctext x='200' y='302' text-anchor='middle' font-size='12' fill='white'%3Eメニューに戻る%3C/text%3E%3C/svg%3E" alt="カレンダー" style={{ width: '100%', borderRadius: '8px', marginBottom: '1rem' }} />
+        </div>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>基本操作：</h3>
+        <ol style={{ lineHeight: '1.8' }}>
+          <li><strong>◀ ▶ボタン</strong>で月を切り替え</li>
+          <li><strong>青色の日付</strong>をクリックしてシフトを確認</li>
+          <li>灰色の日付はシフトが登録されていません</li>
+        </ol>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>色の意味：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><span style={{backgroundColor: '#E3F2FD', padding: '0.2rem 0.5rem', borderRadius: '3px', border: '1px solid #2196F3'}}>青色</span>：シフトあり（クリック可能）</li>
+          <li><span style={{backgroundColor: 'white', padding: '0.2rem 0.5rem', borderRadius: '3px', border: '1px solid #ddd'}}>白色</span>：シフトなし（当月）</li>
+          <li><span style={{backgroundColor: '#f0f0f0', padding: '0.2rem 0.5rem', borderRadius: '3px', border: '1px solid #ddd', opacity: 0.5}}>灰色</span>：他の月の日付</li>
+        </ul>
+        <div style={{ backgroundColor: '#e3f2fd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>💡 ヒント：</strong> カレンダー下部にシフトが登録されている日数が表示されます
+        </div>
+      </div>
+    ),
+    shiftView: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>シフト確認・編集の使い方</h2>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='450'%3E%3Crect width='400' height='450' fill='%23f5f5f5'/%3E%3Crect x='20' y='20' width='360' height='410' rx='10' fill='white' stroke='%231976D2' stroke-width='2'/%3E%3Ctext x='200' y='50' text-anchor='middle' font-size='16' font-weight='bold'%3E2025-01-15（水）%3C/text%3E%3Crect x='30' y='70' width='80' height='30' rx='6' fill='%234CAF50'/%3E%3Ctext x='70' y='91' text-anchor='middle' font-size='11' fill='white'%3E変更モード%3C/text%3E%3Crect x='120' y='70' width='80' height='30' rx='6' fill='%23673AB7'/%3E%3Ctext x='160' y='91' text-anchor='middle' font-size='11' fill='white'%3Eタイムライン%3C/text%3E%3Crect x='210' y='70' width='80' height='30' rx='6' fill='%232196F3'/%3E%3Ctext x='250' y='91' text-anchor='middle' font-size='11' fill='white'%3E更新%3C/text%3E%3Crect x='300' y='70' width='70' height='30' rx='6' fill='%23607D8B'/%3E%3Ctext x='335' y='91' text-anchor='middle' font-size='11' fill='white'%3Eカレンダー%3C/text%3E%3Crect x='30' y='120' width='340' height='280' rx='8' fill='%23f9f9f9' stroke='%23ddd'/%3E%3Ctext x='50' y='145' font-size='11' font-weight='bold'%3E名前%3C/text%3E%3Ctext x='150' y='145' font-size='11' font-weight='bold'%3E店舗%3C/text%3E%3Ctext x='220' y='145' font-size='11' font-weight='bold'%3E勤務時間%3C/text%3E%3Ctext x='320' y='145' font-size='11' font-weight='bold'%3E状態%3C/text%3E%3Crect x='40' y='160' width='320' height='35' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='50' y='182' font-size='10'%3E田中太郎%3C/text%3E%3Ctext x='150' y='182' font-size='10' fill='%231976D2' font-weight='bold'%3EA店舗%3C/text%3E%3Ctext x='220' y='182' font-size='10' font-weight='bold'%3E9:00 - 17:00%3C/text%3E%3Crect x='305' y='168' width='45' height='20' rx='10' fill='%234CAF50'/%3E%3Ctext x='327' y='182' text-anchor='middle' font-size='9' fill='white'%3E出勤%3C/text%3E%3C/svg%3E" alt="シフト確認" style={{ width: '100%', borderRadius: '8px', marginBottom: '1rem' }} />
+        </div>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>ボタンの説明：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong style={{color: '#4CAF50'}}>変更モード</strong>：シフトの編集を開始（オレンジ色でキャンセル可能）</li>
+          <li><strong style={{color: '#673AB7'}}>タイムライン</strong>：時間軸表示に切り替え（編集モード時のみ）</li>
+          <li><strong style={{color: '#2196F3'}}>更新</strong>：変更内容を保存（編集モード時のみ）</li>
+          <li><strong style={{color: '#607D8B'}}>カレンダー</strong>：カレンダー画面に戻る</li>
+        </ul>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>日付移動：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong>◀ボタン</strong>：前の日のシフトを表示</li>
+          <li><strong>▶ボタン</strong>：次の日のシフトを表示</li>
+        </ul>
+        <div style={{ backgroundColor: '#fff3cd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>💡 ヒント：</strong> 日付をクリックすると、その日付が表示されます
+        </div>
+      </div>
+    ),
+    shiftEdit: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>シフト編集の使い方</h2>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23f5f5f5'/%3E%3Crect x='20' y='20' width='360' height='260' rx='10' fill='white' stroke='%231976D2' stroke-width='2'/%3E%3Ctext x='200' y='50' text-anchor='middle' font-size='14' font-weight='bold'%3E編集モード%3C/text%3E%3Crect x='40' y='70' width='320' height='180' rx='8' fill='%23f9f9f9' stroke='%23ddd'/%3E%3Ctext x='50' y='90' font-size='10' fill='%23666'%3E名前%3C/text%3E%3Ctext x='130' y='90' font-size='10' fill='%23666'%3E店舗変更%3C/text%3E%3Ctext x='210' y='90' font-size='10' fill='%23666'%3E開始%3C/text%3E%3Ctext x='280' y='90' font-size='10' fill='%23666'%3E終了%3C/text%3E%3Ctext x='340' y='90' font-size='10' fill='%23666'%3E休%3C/text%3E%3Crect x='50' y='100' width='60' height='25' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='80' y='117' text-anchor='middle' font-size='9'%3E田中%3C/text%3E%3Crect x='120' y='100' width='70' height='25' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='155' y='117' text-anchor='middle' font-size='9'%3EA%3C/text%3E%3Crect x='200' y='100' width='60' height='25' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='230' y='117' text-anchor='middle' font-size='9'%3E9:00%3C/text%3E%3Crect x='270' y='100' width='60' height='25' rx='4' fill='white' stroke='%23ddd'/%3E%3Ctext x='300' y='117' text-anchor='middle' font-size='9'%3E17:00%3C/text%3E%3Crect x='337' y='105' width='15' height='15' rx='2' fill='white' stroke='%23999'/%3E%3Ctext x='50' y='150' font-size='11' fill='%23666'%3E✓ 店舗名を入力%3C/text%3E%3Ctext x='50' y='170' font-size='11' fill='%23666'%3E✓ 開始・終了時刻を選択%3C/text%3E%3Ctext x='50' y='190' font-size='11' fill='%23666'%3E✓ 休みの場合はチェック%3C/text%3E%3Ctext x='50' y='210' font-size='11' fill='%23666'%3E✓ 更新ボタンで保存%3C/text%3E%3C/svg%3E" alt="編集モード" style={{ width: '100%', borderRadius: '8px', marginBottom: '1rem' }} />
+        </div>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>編集手順：</h3>
+        <ol style={{ lineHeight: '1.8' }}>
+          <li><strong>変更モード</strong>ボタンをクリックして編集を開始</li>
+          <li><strong>店舗変更</strong>欄に店舗名を入力（A、B、Cなど）</li>
+          <li><strong>開始・終了時刻</strong>をドロップダウンから選択</li>
+          <li>休みの場合は<strong>休みチェックボックス</strong>にチェック</li>
+          <li><strong>更新</strong>ボタンをクリックして保存</li>
+        </ol>
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>タイムライン表示：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><span style={{backgroundColor: '#90EE90', padding: '0.2rem 0.5rem', borderRadius: '3px'}}>緑色</span>：勤務時間帯</li>
+          <li><span style={{backgroundColor: '#e0e0e0', padding: '0.2rem 0.5rem', borderRadius: '3px'}}>灰色</span>：休み</li>
+          <li>横軸が時間、縦軸がスタッフ名で表示されます</li>
+        </ul>
+        <div style={{ backgroundColor: '#e3f2fd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>📱 推奨：</strong> タイムライン表示は横向き画面での使用を推奨します
+        </div>
+        <div style={{ backgroundColor: '#fff3cd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>⚠️ 注意：</strong> 店舗名が未入力の場合は保存できません。必ず店舗名を入力してください
+        </div>
+      </div>
+    )
+  };
+
+  return contents[page] || contents.calendar;
+};
+
+// ヘルプボタンコンポーネント
+const HelpButton = ({ onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        position: 'absolute',
+        top: '1rem',
+        right: '1rem',
+        backgroundColor: '#FF9800',
+        color: 'white',
+        border: '2px solid #F57C00',
+        borderRadius: '50%',
+        width: '50px',
+        height: '50px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        transition: 'all 0.3s ease',
+        fontSize: '28px',
+        fontWeight: 'bold'
+      }}
+      onMouseEnter={(e) => {
+        e.target.style.backgroundColor = '#F57C00';
+        e.target.style.transform = 'scale(1.1)';
+        e.target.style.boxShadow = '0 6px 12px rgba(0,0,0,0.3)';
+      }}
+      onMouseLeave={(e) => {
+        e.target.style.backgroundColor = '#FF9800';
+        e.target.style.transform = 'scale(1)';
+        e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+      }}
+      title="使い方を見る"
+    >
+      ?
+    </button>
+  );
+};
+
 // 日付文字列を正確に取得する関数（タイムゾーン対応）
 const getDateString = (date) => {
   const year = date.getFullYear();
@@ -22,6 +207,8 @@ function ManagerShiftView({ onBack }) {
   const [editingShifts, setEditingShifts] = useState([]);
   const [showTimeline, setShowTimeline] = useState(false);
   const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+  const [showHelp, setShowHelp] = useState(false);
+  const [currentHelpPage, setCurrentHelpPage] = useState('calendar');
 
   useEffect(() => {
     fetchUsers();
@@ -31,7 +218,6 @@ function ManagerShiftView({ onBack }) {
   useEffect(() => {
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
-      console.log('画面の向き:', portrait ? '縦' : '横', 'Width:', window.innerWidth, 'Height:', window.innerHeight);
       setIsPortrait(portrait);
     };
 
@@ -117,6 +303,7 @@ function ManagerShiftView({ onBack }) {
     if (!availableDates.includes(date)) return;
     setSelectedDate(date);
     fetchShiftData(date);
+    setCurrentHelpPage('shiftView');
   };
 
   const handleBackToCalendar = () => {
@@ -125,6 +312,7 @@ function ManagerShiftView({ onBack }) {
     setShiftData([]);
     setIsEditing(false);
     setShowTimeline(false);
+    setCurrentHelpPage('calendar');
   };
 
   const changeDate = (delta) => {
@@ -155,8 +343,6 @@ function ManagerShiftView({ onBack }) {
 
   const handleEditToggle = () => {
     if (!isEditing) {
-      console.log('編集モード開始 - 元データ:', shiftData);
-      
       setEditingShifts(shiftData.map(shift => {
         const startTime = parseTime36(shift.start_time);
         const endTime = parseTime36(shift.end_time);
@@ -172,8 +358,10 @@ function ManagerShiftView({ onBack }) {
         };
       }));
       setShowTimeline(false);
+      setCurrentHelpPage('shiftEdit');
     } else {
       setShowTimeline(false);
+      setCurrentHelpPage('shiftView');
     }
     setIsEditing(!isEditing);
   };
@@ -268,6 +456,7 @@ function ManagerShiftView({ onBack }) {
       alert('シフトを更新しました');
       setIsEditing(false);
       setShowTimeline(false);
+      setCurrentHelpPage('shiftView');
       fetchShiftData(selectedDate);
       
     } catch (error) {
@@ -348,7 +537,12 @@ function ManagerShiftView({ onBack }) {
   if (currentView === 'calendar') {
     return (
       <div className="login-wrapper" style={{ padding: '0.5rem', boxSizing: 'border-box' }}>
-        <div className="login-card" style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', padding: '1rem' }}>
+        <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} content={getHelpContent(currentHelpPage)} />
+        <div className="login-card" style={{ position: 'relative', width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', padding: '1rem' }}>
+          <HelpButton onClick={() => {
+            setCurrentHelpPage('calendar');
+            setShowHelp(true);
+          }} />
           <h2 style={{ fontSize: 'clamp(1.2rem, 5vw, 1.5rem)' }}>シフト確認（店長）</h2>
 
           <div style={{
@@ -487,6 +681,7 @@ function ManagerShiftView({ onBack }) {
 
   return (
     <div className="fullscreen-table" style={{ padding: '0.5rem', boxSizing: 'border-box', overflow: 'hidden' }}>
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} content={getHelpContent(currentHelpPage)} />
       {isPortrait && isEditing && (
         <div style={{
           position: 'fixed',
@@ -518,6 +713,9 @@ function ManagerShiftView({ onBack }) {
         </div>
       )}
       <div className="login-card" style={{ position: 'relative', width: '100%', height: '100%', boxSizing: 'border-box', padding: '1rem' }}>
+        <HelpButton onClick={() => {
+          setShowHelp(true);
+        }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1rem' }}>
           <button onClick={() => changeDate(-1)} style={{ minWidth: '40px', padding: '0.5rem', backgroundColor: '#607D8B', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '1rem' }}>◀</button>
           <h2 style={{ fontSize: 'clamp(1rem, 4vw, 1.5rem)', margin: 0, textAlign: 'center', flex: 1 }}>

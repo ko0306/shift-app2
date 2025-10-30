@@ -1,6 +1,224 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 
+// ヘルプモーダルコンポーネント
+const HelpModal = ({ isOpen, onClose, content }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      zIndex: 2000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }} onClick={onClose}>
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '80vh',
+        overflow: 'auto',
+        position: 'relative',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+      }} onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'sticky',
+            top: '1rem',
+            left: '100%',
+            marginRight: '1rem',
+            backgroundColor: '#FF5722',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 1,
+            fontSize: '24px',
+            fontWeight: 'bold'
+          }}
+        >
+          ×
+        </button>
+        <div style={{ padding: '2rem', paddingTop: '0' }}>
+          {content}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ヘルプボタンコンポーネント
+const HelpButton = ({ onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        position: 'absolute',
+        top: '1rem',
+        right: '1rem',
+        backgroundColor: '#FF9800',
+        color: 'white',
+        border: '2px solid #F57C00',
+        borderRadius: '50%',
+        width: '50px',
+        height: '50px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        transition: 'all 0.3s ease',
+        fontSize: '28px',
+        fontWeight: 'bold'
+      }}
+      onMouseEnter={(e) => {
+        e.target.style.backgroundColor = '#F57C00';
+        e.target.style.transform = 'scale(1.1)';
+        e.target.style.boxShadow = '0 6px 12px rgba(0,0,0,0.3)';
+      }}
+      onMouseLeave={(e) => {
+        e.target.style.backgroundColor = '#FF9800';
+        e.target.style.transform = 'scale(1)';
+        e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+      }}
+      title="使い方を見る"
+    >
+      ?
+    </button>
+  );
+};
+
+// 使い方ガイドの内容
+const getHelpContent = (page) => {
+  const contents = {
+    calendar: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>勤怠管理カレンダーの使い方</h2>
+        <div style={{ marginBottom: '1.5rem', backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>
+          <p style={{ fontSize: '14px', margin: 0 }}>📅 シフトが確定している日をカレンダーから選択して、スタッフの出退勤時刻を管理できます。</p>
+        </div>
+        
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>操作手順：</h3>
+        <ol style={{ lineHeight: '1.8' }}>
+          <li><strong>青色の日付</strong>：シフトが確定している日です。クリックして選択できます</li>
+          <li><strong>灰色の日付</strong>：シフトが未確定の日です。選択できません</li>
+          <li><strong>◀▶ボタン</strong>：月を切り替えます</li>
+          <li>日付をクリックすると、その日の勤怠入力画面に移動します</li>
+        </ol>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>モード切替：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong>退勤管理モード</strong>：日別にスタッフの出退勤を管理</li>
+          <li><strong>勤務時間集計モード</strong>：期間別・時間帯別に勤務時間を集計</li>
+        </ul>
+
+        <div style={{ backgroundColor: '#e3f2fd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>💡 ヒント：</strong> シフトが確定していない日は、先にシフト作成画面でシフトを確定させてください。
+        </div>
+      </div>
+    ),
+    attendance: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>退勤管理画面の使い方</h2>
+        <div style={{ marginBottom: '1.5rem', backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>
+          <p style={{ fontSize: '14px', margin: 0 }}>⏰ スタッフの実際の出勤・退勤時刻と休憩時間を記録します。</p>
+        </div>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>入力項目：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong>予定開始/終了</strong>：シフト表の予定時刻（変更不可）</li>
+          <li><strong>実際開始</strong>：実際に出勤した時刻を入力</li>
+          <li><strong>実際終了</strong>：実際に退勤した時刻を入力</li>
+          <li><strong>休憩(分)</strong>：休憩時間を分単位で入力</li>
+          <li><strong>労働時間</strong>：自動計算されます</li>
+        </ul>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>操作手順：</h3>
+        <ol style={{ lineHeight: '1.8' }}>
+          <li>各スタッフの<strong>実際開始</strong>時刻を入力</li>
+          <li>各スタッフの<strong>実際終了</strong>時刻を入力</li>
+          <li>休憩時間があれば<strong>休憩(分)</strong>を入力</li>
+          <li><strong>確定</strong>ボタンで保存</li>
+          <li>◀▶ボタンで前後の日付に移動できます</li>
+        </ol>
+
+        <div style={{ backgroundColor: '#fff3cd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>⚠️ 注意：</strong>
+          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.2rem', marginBottom: 0 }}>
+            <li>深夜勤務の場合、25:00や26:30のような表記で自動表示されます</li>
+            <li>労働時間は（実際終了 - 実際開始 - 休憩時間）で計算されます</li>
+            <li>休みの日のスタッフは灰色で表示されます</li>
+          </ul>
+        </div>
+      </div>
+    ),
+    summary: (
+      <div>
+        <h2 style={{ color: '#1976D2', marginBottom: '1rem' }}>勤務時間集計モードの使い方</h2>
+        <div style={{ marginBottom: '1.5rem', backgroundColor: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>
+          <p style={{ fontSize: '14px', margin: 0 }}>📊 月別・日別で勤務時間を集計し、時間帯別の内訳も確認できます。</p>
+        </div>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>フィルター機能：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong>従業員選択</strong>：特定のスタッフだけを表示（全従業員も選択可）</li>
+          <li><strong>期間単位</strong>：月別集計 or 日別集計</li>
+          <li><strong>対象期間</strong>：集計する年月または日付を選択</li>
+          <li><strong>年度選択</strong>：集計する年度を切り替え</li>
+        </ul>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>時間帯の編集：</h3>
+        <ol style={{ lineHeight: '1.8' }}>
+          <li><strong>時間帯の編集</strong>ボタンをクリック</li>
+          <li>既存の時間帯の<strong>ラベル名・開始・終了</strong>を編集</li>
+          <li>不要な時間帯は<strong>削除</strong>ボタンで削除</li>
+          <li>新しい時間帯を追加する場合：
+            <ul>
+              <li>緑色のエリアで<strong>ラベル名・開始・終了</strong>を入力</li>
+              <li><strong>追加</strong>ボタンをクリック</li>
+            </ul>
+          </li>
+          <li><strong>設定を保存</strong>で確定</li>
+        </ol>
+
+        <h3 style={{ color: '#1976D2', marginTop: '1.5rem' }}>集計表の見方：</h3>
+        <ul style={{ lineHeight: '1.8' }}>
+          <li><strong>総勤務時間</strong>：期間内の総労働時間</li>
+          <li><strong>各時間帯</strong>：設定した時間帯ごとの労働時間内訳</li>
+          <li>勤務時間が多い順に並んでいます</li>
+        </ul>
+
+        <div style={{ backgroundColor: '#e3f2fd', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
+          <strong>💡 活用例：</strong>
+          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.2rem', marginBottom: 0 }}>
+            <li>「深夜時間（22:00〜5:00）」を追加して深夜手当を計算</li>
+            <li>「午前時間」「午後時間」で時間帯別の人員配置を分析</li>
+            <li>月別集計で給与計算の基礎データを作成</li>
+          </ul>
+        </div>
+      </div>
+    )
+  };
+
+  return contents[page] || contents.calendar;
+};
+
 // 日付文字列を正確に取得する関数（タイムゾーン対応）
 const getDateString = (date) => {
   const year = date.getFullYear();
@@ -253,7 +471,7 @@ const TimePeriodEditor = ({ timePeriods, setTimePeriods, onClose }) => {
 // SummaryView (勤務時間集計モードのサブコンポーネント)
 // ----------------------------------------------------------------------
 
-const SummaryView = ({ userMap, availableDates, onBackToCalendar }) => {
+const SummaryView = ({ userMap, availableDates, onBackToCalendar, onHelpClick }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [filter, setFilter] = useState('monthly'); 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
@@ -434,7 +652,8 @@ const SummaryView = ({ userMap, availableDates, onBackToCalendar }) => {
   };
 
   return (
-    <div className="login-card" style={{ width: '1100px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div className="login-card" style={{ width: '1100px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+      <HelpButton onClick={onHelpClick} />
       <h2 style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         勤務時間集計
         <select 
@@ -583,6 +802,8 @@ function ManagerAttendance({ onBack }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availableDates, setAvailableDates] = useState([]);
   const [currentView, setCurrentView] = useState('calendar');
+  const [showHelp, setShowHelp] = useState(false);
+  const [currentHelpPage, setCurrentHelpPage] = useState('calendar');
 
   useEffect(() => {
     fetchAvailableDates();
@@ -696,6 +917,7 @@ function ManagerAttendance({ onBack }) {
 
       setAttendanceData(sortedData);
       setCurrentView('attendance');
+      setCurrentHelpPage('attendance');
     } catch (error) {
       console.error('データ取得エラー:', error);
     } finally {
@@ -783,6 +1005,7 @@ function ManagerAttendance({ onBack }) {
 
   const handleBackToCalendar = () => {
     setCurrentView('calendar');
+    setCurrentHelpPage('calendar');
     setSelectedDate('');
     setAttendanceData([]);
   };
@@ -850,10 +1073,18 @@ function ManagerAttendance({ onBack }) {
   if (currentView === 'summary') {
     return (
       <div className="login-wrapper">
+        <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} content={getHelpContent(currentHelpPage)} />
         <SummaryView 
           userMap={userMap} 
           availableDates={availableDates} 
-          onBackToCalendar={handleBackToCalendar}
+          onBackToCalendar={() => {
+            handleBackToCalendar();
+            setCurrentHelpPage('calendar');
+          }}
+          onHelpClick={() => {
+            setCurrentHelpPage('summary');
+            setShowHelp(true);
+          }}
         />
       </div>
     );
@@ -862,7 +1093,12 @@ function ManagerAttendance({ onBack }) {
   if (currentView === 'calendar') {
     return (
       <div className="login-wrapper">
-        <div className="login-card" style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+        <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} content={getHelpContent(currentHelpPage)} />
+        <div className="login-card" style={{ width: '600px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+          <HelpButton onClick={() => {
+            setCurrentHelpPage('calendar');
+            setShowHelp(true);
+          }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2>勤怠管理</h2>
           </div>
@@ -883,7 +1119,10 @@ function ManagerAttendance({ onBack }) {
               退勤管理モード
             </button>
             <button
-              onClick={() => setCurrentView('summary')}
+              onClick={() => {
+                setCurrentView('summary');
+                setCurrentHelpPage('summary');
+              }}
               style={{
                 padding: '0.75rem 2rem',
                 backgroundColor: '#FF9800',
@@ -1003,7 +1242,12 @@ function ManagerAttendance({ onBack }) {
   // Attendance View (日別勤怠入力)
   return (
     <div className="login-wrapper">
-      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto' }}>
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} content={getHelpContent(currentHelpPage)} />
+      <div className="login-card" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+        <HelpButton onClick={() => {
+          setCurrentHelpPage('attendance');
+          setShowHelp(true);
+        }} />
         <h2 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
           <button onClick={() => changeDate(-1)} style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>◀</button>
           {selectedDate} ({getWeekday(selectedDate)})
